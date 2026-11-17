@@ -3,9 +3,10 @@
  *
  * The simulation works in meters with the y axis pointing up; the canvas has
  * its y axis pointing down. The renderer fits the whole circuit in the canvas
- * and flips the axis. All colors have enough contrast against their
- * background (at least 3:1 for graphics) and the car is also recognizable by
- * its shape, not only by its color.
+ * and flips the axis. The car is recognizable by its shape, not only by its
+ * color. The WCAG contrast ratios quoted below were computed for the pairs of
+ * colors that they name; the drawing as a whole was not checked against a
+ * minimum.
  *
  * With the rule `tailSlide` the car is drawn as a body that may be turned away
  * from the lane, with the guide pin, which stays on the lane, marked on it, and
@@ -39,15 +40,17 @@ const CAR_WIDTH = 0.06;
 // The guide pin: a dark core in a light ring with a thin dark outline, so that
 // it stands out both on the yellow body and on the dark surface when the car is
 // off the track. WCAG contrast ratios of the neighbouring colors: core on ring
-// 21:1, outline on the yellow body 14.7:1, ring on the surface 10.6:1.
+// 21:1, outline on the yellow body 14.7:1, ring on the surface 10.6:1. The ring
+// reaches the windscreen, where the outline is only 1.34:1 against it; there
+// the ring (15.7:1 on the windscreen) and the core make the pin out.
 const PIN_RADIUS = 0.009;
 const PIN_OUTLINE = 0.0015;
 const PIN_CORE_RATIO = 0.55;
 // The marks of the sliding rear tires. The strongest fresh mark, from a hard
 // slide, is drawn at this opacity; a milder slide gives a fainter mark, in
 // proportion, and every mark fades out with time (see `tireMarks.js`). The
-// strongest has a contrast of 4.66:1 on the surface (WCAG ratio of the blended
-// color); the fainter ones are decorative and have less.
+// strongest has a contrast of 4.65:1 on the surface (WCAG ratio of the blended
+// color, rounded to 8 bits); the fainter ones are decorative and have less.
 const TIRE_MARK_WIDTH = 0.008;
 const TIRE_MARK_OPACITY = 0.7;
 const CHECKER_DEPTH = 0.016;

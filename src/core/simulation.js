@@ -15,8 +15,11 @@
  *   slides out above the grip limit, and costs speed while it slides. The car
  *   leaves the track only when the body has turned too far (`hasSpunOut`), and
  *   not at the grip limit. With the rule off the car is a single point and
- *   leaves the track at the grip limit, as described above. Where the tail
- *   never slides, the motion of the pin is exactly the one of the plain model.
+ *   leaves the track at the grip limit, as described above. The two models
+ *   are not the same in general: where the tail never slides, the motion of
+ *   the pin is the one of the plain model for the throttles and lanes that the
+ *   tests try, but a body that has settled in a curve can hold a curve just
+ *   above the grip limit, which the plain model leaves.
  * - Off the track the car slides straight along the tangent at the exit point
  *   and the throttle is ignored. After the recovery time a marshal puts it
  *   back on its lane at the exit point, at rest. The distance counted for the

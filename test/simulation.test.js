@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { OVAL, buildCircuit } from '../src/core/circuits.js';
-import { straight, curve } from '../src/core/geometry.js';
+import { straight, curve, createTrack, createLane } from '../src/core/geometry.js';
 import { terminalSpeed, withParams, DEFAULT_PARAMS } from '../src/core/physics.js';
 import {
   DEFAULT_RULES,
@@ -341,7 +341,7 @@ test('with the tail rule the car starts aligned, with no slide', () => {
   });
 });
 
-test('where the tail never slides the motion is exactly the plain one', () => {
+test('for the throttles and lanes tried, where the tail never slides the motion is exactly the plain one', () => {
   for (const laneName of ['inner', 'outer']) {
     for (const throttle of [0.3, 0.45]) {
       const plain = run(contextFor(laneName), 60, () => throttle);
@@ -352,6 +352,37 @@ test('where the tail never slides the motion is exactly the plain one', () => {
       }
       assert.ok(tail.at(-1).timer.laps.length >= 8);
     }
+  }
+});
+
+test('the identity with the plain model is not general: a settled body holds a curve just above the grip limit', () => {
+  // A circle of 0.35 m at 2.06 m/s asks for 12.1 m/s^2, above the 12 of the grip
+  // limit. The plain model leaves the track at once. The body, started in the
+  // rolling state that this curve settles to (the tail inside, no slide), stays
+  // on the track with the tail holding, because it leaves only when it has turned
+  // too far and not at the grip limit.
+  const radius = 0.35;
+  const speed = 2.0579115627256677;
+  const throttle = 0.4846698125451335; // keeps this speed
+  const lane = createLane(createTrack([curve(radius, 2 * Math.PI)]), 0);
+  assert.ok((speed * speed) / radius > DEFAULT_PARAMS.maxLateralAcceleration);
+  const start = (ctx) => {
+    const world = createWorld(ctx);
+    const car = { ...world.car, distance: 0, speed };
+    return ctx.tailSlide
+      ? { ...world, car: { ...car, slip: -Math.asin(DEFAULT_PARAMS.pinToRearAxle / radius), yawRate: speed / radius } }
+      : { ...world, car };
+  };
+
+  const plainContext = createContext({ lane, rules: { tailSlide: false } });
+  assert.equal(stepWorld(start(plainContext), { throttle }, plainContext).car.status, 'offTrack');
+
+  const tailContext = createContext({ lane });
+  let world = start(tailContext);
+  for (let i = 0; i < 1200; i += 1) {
+    world = stepWorld(world, { throttle }, tailContext);
+    assert.equal(world.car.status, 'onTrack', `step ${i}`);
+    assert.equal(world.car.rearSlip, 0, `step ${i}`);
   }
 });
 
@@ -452,7 +483,8 @@ test('the tail rule is deterministic and does not modify the world it receives',
 });
 
 test('a lap with a sliding tail depends little on the physics step', () => {
-  // Steps above 1/120 s are too coarse for the tail and are rejected.
+  // The game steps by 1/120 s. The simulation refuses steps of 1/62.5 s or more
+  // (the pin-to-axle distance over the free speed), so 1/120 s is not its limit.
   const lane = circuit.lanes.inner;
   function firstLap(dt) {
     const stepContext = createContext({ lane, rules: { dt, tailSlide: true } });
