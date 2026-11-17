@@ -10,6 +10,8 @@ import {
   criticalSpeed,
   hasLostGrip,
   stepOffTrack,
+  stepYaw,
+  hasSpunOut,
 } from '../src/core/physics.js';
 
 const DT = 1 / 120;
@@ -216,4 +218,235 @@ test('the grip parameters can be overridden', () => {
     stepOffTrack({ travel: 0, speed: 4 }, DT, slippery).speed
       < stepOffTrack({ travel: 0, speed: 4 }, DT).speed,
   );
+});
+
+// The body pivots about the guide pin and the tail may slide out.
+
+const REAR = DEFAULT_PARAMS.pinToRearAxle;
+const GRIP = DEFAULT_PARAMS.maxLateralAcceleration;
+
+/** Speed that needs the given lateral acceleration on the given curvature. */
+function speedFor(lateral, curvature) {
+  return Math.sqrt(lateral / Math.abs(curvature));
+}
+
+/** Angle of the body to the lane while the tail rolls on a constant curve. */
+function rollingSlip(curvature, params = DEFAULT_PARAMS) {
+  return -Math.asin(params.pinToRearAxle * curvature);
+}
+
+/** The state of a tail rolling steadily on a constant curve. */
+function rollingState(speed, curvature, params = DEFAULT_PARAMS) {
+  return { slip: rollingSlip(curvature, params), yawRate: speed * curvature, rearSlip: 0 };
+}
+
+/** Runs the yaw model on a constant curve at a constant speed. */
+function circle(state, speed, curvature, seconds, { dt = DT, params = DEFAULT_PARAMS } = {}) {
+  const turn = speed * curvature * dt;
+  const steps = Math.round(seconds / dt);
+  const history = [state];
+  for (let i = 0; i < steps; i += 1) {
+    state = stepYaw(state, { speed, curvature, turn }, dt, params);
+    history.push(state);
+  }
+  return history;
+}
+
+function last(list) {
+  return list[list.length - 1];
+}
+
+function deepFreeze(value) {
+  for (const inner of Object.values(value)) {
+    if (inner !== null && typeof inner === 'object') deepFreeze(inner);
+  }
+  return Object.freeze(value);
+}
+
+test('the yaw model leaves a car that drives straight exactly aligned', () => {
+  const history = circle({ slip: 0, yawRate: 0, rearSlip: 0 }, 3, 0, 5);
+  for (const state of history) {
+    assert.ok(state.slip === 0, `slip ${state.slip}`);
+    assert.ok(state.yawRate === 0, `yaw rate ${state.yawRate}`);
+    assert.ok(state.rearSlip === 0, `rear slip ${state.rearSlip}`);
+  }
+  assert.deepEqual(Object.keys(last(history)).sort(), ['rearSlip', 'slip', 'yawRate']);
+});
+
+test('below the grip limit the tail rolls behind the pin, on the inside of the curve', () => {
+  const start = { slip: 0, yawRate: 0, rearSlip: 0 };
+  const history = circle(start, 1.5, INNER_CURVATURE, 2);
+  near(rollingSlip(INNER_CURVATURE), -0.2306, 1e-4);
+  near(last(history).slip, rollingSlip(INNER_CURVATURE), 1e-6);
+  near(last(history).yawRate, 1.5 * INNER_CURVATURE, 1e-6);
+  for (const state of history) assert.ok(state.rearSlip === 0, `rear slip ${state.rearSlip}`);
+  // A curve to the right mirrors a curve to the left exactly.
+  const mirrored = circle(start, 1.5, -INNER_CURVATURE, 2);
+  // Zero is compared without its sign: -0 and 0 are the same value here.
+  const unsigned = (x) => (x === 0 ? 0 : x);
+  assert.deepStrictEqual(
+    mirrored.map((s) => ({ slip: unsigned(s.slip), yawRate: unsigned(s.yawRate), rearSlip: unsigned(s.rearSlip) })),
+    history.map((s) => ({ slip: unsigned(-s.slip), yawRate: unsigned(-s.yawRate), rearSlip: unsigned(-s.rearSlip) })),
+  );
+});
+
+test('the slide starts just above the grip limit and not just below it', () => {
+  // With the tail rolling inside, the limit is a little above the plain 12 m/s^2.
+  const onset = GRIP / Math.sqrt(1 - (REAR * INNER_CURVATURE) ** 2);
+  assert.ok(onset > GRIP);
+  near(onset, 12.33, 0.01);
+
+  const below = speedFor(0.99 * onset, INNER_CURVATURE);
+  const holding = circle(rollingState(below, INNER_CURVATURE), below, INNER_CURVATURE, 3);
+  for (const state of holding) {
+    assert.ok(state.rearSlip === 0, `rear slip ${state.rearSlip}`);
+    near(state.slip, rollingSlip(INNER_CURVATURE), 1e-9);
+  }
+
+  const above = speedFor(1.01 * onset, INNER_CURVATURE);
+  const sliding = circle(rollingState(above, INNER_CURVATURE), above, INNER_CURVATURE, 3);
+  assert.ok(sliding.some((state) => state.rearSlip !== 0));
+  // The tail ends up outside the curve at acos(limit / lateral acceleration).
+  const lateral = lateralAcceleration(above, INNER_CURVATURE);
+  near(last(sliding).slip, Math.acos(GRIP / lateral), 0.01);
+  assert.ok(last(sliding).slip > 0);
+});
+
+test('above the limit the tail opens gradually and settles outside the curve', () => {
+  const calm = circle(
+    { slip: 0, yawRate: 0, rearSlip: 0 },
+    1.5,
+    INNER_CURVATURE,
+    2,
+  );
+  const history = circle(last(calm), 2.2, INNER_CURVATURE, 3);
+  const target = Math.acos(GRIP / lateralAcceleration(2.2, INNER_CURVATURE));
+  near(target, 0.5201, 1e-4);
+  near(last(history).slip, target, 0.01);
+
+  let largestStep = 0;
+  let highest = -Infinity;
+  for (let i = 1; i < history.length; i += 1) {
+    largestStep = Math.max(largestStep, Math.abs(history[i].slip - history[i - 1].slip));
+    highest = Math.max(highest, history[i].slip);
+  }
+  assert.ok(largestStep < 0.05, `largest step ${largestStep}`);
+  assert.ok(highest < target + 0.01, `overshoot ${highest - target}`);
+
+  // The rear axle slides toward the outside of the curve: to the right (negative)
+  // in a curve to the left, to the left (positive) in a curve to the right. Its
+  // sideways speed is the velocity of the axle across the body.
+  assert.ok(last(history).rearSlip < 0, `rear slip ${last(history).rearSlip}`);
+  const rightCalm = circle({ slip: 0, yawRate: 0, rearSlip: 0 }, 1.5, -INNER_CURVATURE, 2);
+  const rightHistory = circle(last(rightCalm), 2.2, -INNER_CURVATURE, 3);
+  assert.ok(last(rightHistory).rearSlip > 0, `rear slip ${last(rightHistory).rearSlip}`);
+  for (let i = 1; i < history.length; i += 1) {
+    if (history[i].rearSlip === 0) continue;
+    const across = -2.2 * Math.sin(history[i - 1].slip) - REAR * history[i].yawRate;
+    near(history[i].rearSlip, across, 1e-12, `step ${i}`);
+  }
+
+  // The opening takes time: halfway there is not reached in the first 0.2 s.
+  const halfway = (rollingSlip(INNER_CURVATURE) + target) / 2;
+  const reached = history.findIndex((state) => state.slip >= halfway);
+  assert.ok(reached > 0.2 / DT, `halfway after ${reached} steps`);
+  assert.ok(history.some((state) => state.rearSlip !== 0));
+});
+
+test('when the speed drops the tail grips again and comes back in line', () => {
+  const calm = circle({ slip: 0, yawRate: 0, rearSlip: 0 }, 1.5, INNER_CURVATURE, 2);
+  const open = circle(last(calm), 2.2, INNER_CURVATURE, 3);
+  const back = circle(last(open), 1.5, INNER_CURVATURE, 1);
+  near(last(back).slip, rollingSlip(INNER_CURVATURE), 1e-3);
+  assert.ok(last(back).rearSlip === 0);
+});
+
+test('the slide dies out thanks to the damping and would not without it', () => {
+  const start = rollingState(2.1, INNER_CURVATURE);
+  const spread = (history) => {
+    const slips = history.slice(-Math.round(1 / DT)).map((state) => state.slip);
+    return Math.max(...slips) - Math.min(...slips);
+  };
+  const damped = circle(start, 2.1, INNER_CURVATURE, 8);
+  assert.ok(spread(damped) < 1e-3, `spread ${spread(damped)}`);
+  const free = withParams({ slideDamping: 1e-6 });
+  const swinging = circle(start, 2.1, INNER_CURVATURE, 8, { params: free });
+  assert.ok(spread(swinging) > 0.1, `spread ${spread(swinging)}`);
+});
+
+test('the car spins out only above the angle limit', () => {
+  const calm = circle({ slip: 0, yawRate: 0, rearSlip: 0 }, 1.5, INNER_CURVATURE, 2);
+  const firm = circle(last(calm), 2.2, INNER_CURVATURE, 4);
+  assert.ok(firm.every((state) => !hasSpunOut(state.slip)));
+  const fast = circle(last(calm), 2.4, INNER_CURVATURE, 4);
+  assert.ok(fast.some((state) => hasSpunOut(state.slip)));
+});
+
+test('the yaw model converges as the time step shrinks', () => {
+  const calm = circle({ slip: 0, yawRate: 0, rearSlip: 0 }, 1.5, INNER_CURVATURE, 2);
+  const slipAfter = (dt) => last(circle(last(calm), 2.2, INNER_CURVATURE, 0.5, { dt })).slip;
+  const reference = slipAfter(1 / 1920);
+  const errors = [1 / 60, 1 / 120, 1 / 240, 1 / 480].map((dt) => Math.abs(slipAfter(dt) - reference));
+  for (let i = 1; i < errors.length; i += 1) {
+    assert.ok(errors[i] < errors[i - 1], `errors ${errors}`);
+  }
+  assert.ok(errors[1] < 0.05, `errors ${errors}`);
+});
+
+test('the yaw model rejects a step that is too coarse and invalid arguments', () => {
+  const state = { slip: 0, yawRate: 0 };
+  const motion = { speed: 2, curvature: 1, turn: 0.01 };
+  assert.doesNotThrow(() => stepYaw(state, motion, DT));
+  // The car must not cover the pin-to-axle distance in a single step.
+  assert.throws(() => stepYaw(state, { ...motion, speed: 10 }, DT), RangeError);
+  assert.throws(() => stepYaw(state, motion, 1), RangeError);
+  assert.throws(() => stepYaw(state, motion, 0), RangeError);
+  assert.throws(() => stepYaw(state, motion, -DT), RangeError);
+  assert.throws(() => stepYaw(state, { ...motion, speed: -1 }, DT), RangeError);
+  assert.throws(() => stepYaw(state, { ...motion, speed: Number.NaN }, DT), RangeError);
+  assert.throws(() => stepYaw(state, { ...motion, curvature: Number.NaN }, DT), RangeError);
+  assert.throws(() => stepYaw(state, { ...motion, turn: Number.POSITIVE_INFINITY }, DT), RangeError);
+  assert.throws(() => stepYaw({ slip: Number.NaN, yawRate: 0 }, motion, DT), RangeError);
+  assert.throws(() => stepYaw({ slip: 0, yawRate: Number.NaN }, motion, DT), RangeError);
+});
+
+test('the yaw model is pure, deterministic and does not touch its arguments', () => {
+  const state = deepFreeze({ slip: 0.1, yawRate: 1, rearSlip: 0 });
+  const motion = deepFreeze({ speed: 2.2, curvature: INNER_CURVATURE, turn: 2.2 * INNER_CURVATURE * DT });
+  const first = stepYaw(state, motion, DT, DEFAULT_PARAMS);
+  assert.deepStrictEqual(stepYaw(state, motion, DT, DEFAULT_PARAMS), first);
+  assert.deepStrictEqual(stepYaw(state, motion, DT), first);
+  assert.notEqual(first, state);
+});
+
+test('the tail parameters are positive, documented defaults that can be overridden', () => {
+  for (const name of [
+    'pinToCenterOfMass',
+    'pinToRearAxle',
+    'bodyRadiusOfGyration',
+    'slideDamping',
+    'maxSlipAngle',
+  ]) {
+    assert.ok(Number.isFinite(DEFAULT_PARAMS[name]) && DEFAULT_PARAMS[name] > 0, name);
+    assert.throws(() => withParams({ [name]: 0 }), RangeError);
+    assert.throws(() => withParams({ [name]: Number.NaN }), RangeError);
+  }
+  const short = withParams({ pinToRearAxle: 0.04 });
+  assert.equal(short.pinToRearAxle, 0.04);
+  near(rollingSlip(INNER_CURVATURE, short), -Math.asin(0.04 * INNER_CURVATURE), 1e-15);
+  const settled = circle({ slip: 0, yawRate: 0, rearSlip: 0 }, 1.5, INNER_CURVATURE, 2, { params: short });
+  near(last(settled).slip, rollingSlip(INNER_CURVATURE, short), 1e-6);
+});
+
+test('the spin-out test is strict, symmetric and uses the angle limit', () => {
+  const limit = DEFAULT_PARAMS.maxSlipAngle;
+  assert.equal(hasSpunOut(limit), false);
+  assert.equal(hasSpunOut(limit * (1 + 1e-9)), true);
+  assert.equal(hasSpunOut(-limit), false);
+  assert.equal(hasSpunOut(-limit * (1 + 1e-9)), true);
+  assert.equal(hasSpunOut(0), false);
+  const strict = withParams({ maxSlipAngle: 0.3 });
+  assert.equal(hasSpunOut(0.4, strict), true);
+  assert.equal(hasSpunOut(0.4), false);
+  assert.throws(() => hasSpunOut(Number.NaN), RangeError);
 });
