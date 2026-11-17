@@ -9,13 +9,14 @@
  * - On the track the car follows the longitudinal physics of `physics.js`.
  *   After every step, if the lateral acceleration needed by the curve is above
  *   the grip limit, the car leaves the track.
- * - With the rule `tailSlide` the car is a body hinged at its guide pin. The
- *   pin follows the lane as above, and the body turns about it: the tail
- *   rolls behind the pin while its wheels hold, slides out above the grip
- *   limit, and costs speed while it slides. The car leaves the track only when
- *   the body has turned too far (`hasSpunOut`), and not at the grip limit.
- *   The rule is off by default, and where the tail never slides the motion of
- *   the pin is exactly the one of the plain model.
+ * - With the rule `tailSlide`, which is on by default, the car is a body
+ *   hinged at its guide pin. The pin follows the lane as above, and the body
+ *   turns about it: the tail rolls behind the pin while its wheels hold,
+ *   slides out above the grip limit, and costs speed while it slides. The car
+ *   leaves the track only when the body has turned too far (`hasSpunOut`), and
+ *   not at the grip limit. With the rule off the car is a single point and
+ *   leaves the track at the grip limit, as described above. Where the tail
+ *   never slides, the motion of the pin is exactly the one of the plain model.
  * - Off the track the car slides straight along the tangent at the exit point
  *   and the throttle is ignored. After the recovery time a marshal puts it
  *   back on its lane at the exit point, at rest. The distance counted for the
@@ -53,8 +54,9 @@ export const DEFAULT_RULES = Object.freeze({
   // that the first crossing starts the clock.
   startDistance: -0.1,
   // Whether the body of the car pivots about the guide pin and the tail can
-  // slide out (see the module comment). Off, the car is a single point.
-  tailSlide: false,
+  // slide out (see the module comment). Off, the car is a single point on the
+  // lane that leaves the track as soon as the grip limit is exceeded.
+  tailSlide: true,
 });
 
 /** Visual spin of a sliding car, in radians per meter slid. Not physical. */

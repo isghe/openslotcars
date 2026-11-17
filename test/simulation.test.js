@@ -15,8 +15,12 @@ import {
 
 const circuit = buildCircuit(OVAL);
 
+/**
+ * Context of the plain model, where the car is a single point on the lane. The
+ * tail rule is on by default, so the plain model is asked for explicitly.
+ */
 function contextFor(laneName, rules) {
-  return createContext({ lane: circuit.lanes[laneName], rules });
+  return createContext({ lane: circuit.lanes[laneName], rules: { tailSlide: false, ...rules } });
 }
 
 /** Runs the simulation with a throttle given as a function of the world. */
@@ -254,7 +258,7 @@ test('a lap time converges as the physics step gets smaller', () => {
   // the integration of the motion is only first-order accurate.
   const lane = circuit.lanes.inner;
   function firstLap(dt) {
-    const stepContext = createContext({ lane, rules: { dt } });
+    const stepContext = createContext({ lane, rules: { dt, tailSlide: false } });
     let world = createWorld(stepContext);
     for (let i = 0; i < 200000 && world.timer.laps.length === 0; i += 1) {
       world = stepWorld(world, { throttle: 0.3 }, stepContext);
@@ -286,8 +290,21 @@ function plainPart(world) {
   return { stepIndex: world.stepIndex, time: world.time, timer: world.timer, car: { status, distance, speed } };
 }
 
-test('the tail rule is off by default and then the car keeps its plain state', () => {
-  assert.equal(DEFAULT_RULES.tailSlide, false);
+test('the tail rule is on by default', () => {
+  assert.equal(DEFAULT_RULES.tailSlide, true);
+  const context = createContext({ lane: circuit.lanes.inner });
+  assert.equal(context.tailSlide, true);
+  assert.deepEqual(createWorld(context).car, {
+    status: 'onTrack', distance: -0.1, speed: 0, slip: 0, yawRate: 0, rearSlip: 0,
+  });
+  // A default context behaves as the one that asks for the rule.
+  assert.deepStrictEqual(
+    run(context, 5, () => 0.6),
+    run(tailContext('inner'), 5, () => 0.6),
+  );
+});
+
+test('with the tail rule off the car keeps its plain state', () => {
   const context = contextFor('inner');
   assert.equal(context.tailSlide, false);
   const history = run(context, 5, () => 1);
