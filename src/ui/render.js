@@ -151,8 +151,25 @@ export function createRenderer(canvas, circuit, context) {
     offsetY = (height - boundsHeight * scale) / 2;
   }
 
-  /** Draws the circuit and the car of the given world. */
-  function draw(world) {
+  function drawPauseOverlay() {
+    surface.fillStyle = 'rgba(15, 18, 22, 0.72)';
+    surface.fillRect(0, 0, width, height);
+    surface.fillStyle = PALETTE.checkerLight;
+    surface.textAlign = 'center';
+    surface.textBaseline = 'middle';
+    surface.font = `600 ${Math.round(height * 0.12)}px system-ui, sans-serif`;
+    surface.fillText('Paused', width / 2, height / 2 - height * 0.04);
+    surface.font = `${Math.round(height * 0.055)}px system-ui, sans-serif`;
+    surface.fillText('Press P to resume', width / 2, height / 2 + height * 0.08);
+  }
+
+  /**
+   * Draws the circuit and the car of the given world.
+   * @param {object} world World to draw.
+   * @param {{paused?: boolean}} [options] When `paused`, a message is drawn
+   *   over the circuit.
+   */
+  function draw(world, { paused = false } = {}) {
     surface.fillStyle = PALETTE.background;
     surface.fillRect(0, 0, width, height);
 
@@ -161,6 +178,7 @@ export function createRenderer(canvas, circuit, context) {
     for (const points of lanePoints) strokePath(points, PALETTE.slot, SLOT_WIDTH);
     drawFinishLine();
     drawCar(world);
+    if (paused) drawPauseOverlay();
   }
 
   resize();

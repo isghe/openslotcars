@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>OpenSlotCars</title>
     <meta name="description" content="A slot car racing simulator that runs entirely in the browser.">
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="./style.css">
   </head>
   <body>
@@ -15,6 +16,16 @@
         role="img"
         aria-label="Top-down view of an oval slot car track with one car on the inner lane, near the finish line."
       ></canvas>
+      <section class="controls" aria-label="Controls">
+        <button id="throttle" type="button" aria-pressed="false">Throttle</button>
+        <button id="pause" type="button" aria-pressed="false">Pause</button>
+        <button id="restart" type="button">Restart</button>
+      </section>
+      <p class="help">
+        Hold <kbd>Space</kbd> or <kbd>&uarr;</kbd> to accelerate; the longer you hold,
+        the more throttle you give. Release to brake. A car that goes too fast in a
+        curve leaves the track. <kbd>P</kbd> or <kbd>Esc</kbd> pauses, <kbd>R</kbd> restarts.
+      </p>
       <noscript>OpenSlotCars needs JavaScript to run the simulation.</noscript>
     </main>
     <script type="module" src="./src/main.js"></script>

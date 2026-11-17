@@ -42,3 +42,62 @@ noscript {
   margin-top: 12px;
   color: var(--page-muted);
 }
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+button {
+  min-height: 48px;
+  padding: 8px 20px;
+  border: 2px solid #aab2bd;
+  border-radius: 8px;
+  background: #1c222a;
+  color: var(--page-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #252d38;
+}
+
+button:focus-visible {
+  outline: 3px solid #ffd400;
+  outline-offset: 2px;
+}
+
+button[aria-pressed="true"] {
+  border-color: #ffd400;
+  background: #3a3300;
+}
+
+#throttle {
+  flex: 1 1 240px;
+  min-height: 72px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  /* The button is held down: no scrolling, zooming or text selection. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.help {
+  margin: 12px 0 0;
+  color: var(--page-muted);
+}
+
+kbd {
+  padding: 1px 6px;
+  border: 1px solid #aab2bd;
+  border-radius: 4px;
+  background: #1c222a;
+  color: var(--page-text);
+  font: inherit;
+  font-size: 0.9em;
+}
