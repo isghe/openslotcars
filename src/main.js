@@ -17,10 +17,18 @@ import {
   interpolateWorld,
 } from './core/simulation.js';
 import { createStepper } from './core/stepper.js';
+import { createHud } from './ui/hud.js';
 import { bindInput } from './ui/input.js';
 import { createRenderer } from './ui/render.js';
 
 const canvas = document.getElementById('track');
+const hud = createHud({
+  currentLap: document.getElementById('current-lap'),
+  lastLap: document.getElementById('last-lap'),
+  bestLap: document.getElementById('best-lap'),
+  laps: document.getElementById('laps'),
+  announcer: document.getElementById('announcer'),
+});
 const throttleButton = document.getElementById('throttle');
 const pauseButton = document.getElementById('pause');
 const restartButton = document.getElementById('restart');
@@ -35,6 +43,7 @@ bindInput({ controls, throttleButton, pauseButton, restartButton });
 let world = createWorld(context);
 let previous = world;
 let lastFrameTime = null;
+hud.update(world);
 
 /** Keeps the pressed state of the buttons in line with the controls. */
 function syncButtons() {
@@ -48,6 +57,7 @@ function restart() {
   stepper.reset();
   controls.resetThrottle();
   controls.setPaused(false);
+  hud.restart(world);
 }
 
 function frame(now) {
@@ -72,6 +82,7 @@ function frame(now) {
     previous = world;
     world = stepWorld(world, { throttle: controls.throttle }, context);
   }
+  hud.update(world);
   renderer.draw(interpolateWorld(previous, world, alpha));
   requestAnimationFrame(frame);
 }

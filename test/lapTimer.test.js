@@ -222,3 +222,20 @@ test('invalid lap times cannot be formatted', () => {
   assert.throws(() => formatLapTime(Number.NaN), RangeError);
   assert.throws(() => formatLapTime(Number.POSITIVE_INFINITY), RangeError);
 });
+
+test('lap times can be formatted with fewer decimals', () => {
+  assert.equal(formatLapTime(4.213, 1), '4.2 s');
+  assert.equal(formatLapTime(4.26, 1), '4.3 s');
+  assert.equal(formatLapTime(4.213, 2), '4.21 s');
+  assert.equal(formatLapTime(64.26, 1), '1:04.3');
+  assert.equal(formatLapTime(59.96, 1), '1:00.0');
+  assert.equal(formatLapTime(0, 1), '0.0 s');
+  assert.equal(formatLapTime(4.213, 3), formatLapTime(4.213));
+});
+
+test('the number of decimals is validated', () => {
+  assert.throws(() => formatLapTime(4, 0), RangeError);
+  assert.throws(() => formatLapTime(4, 4), RangeError);
+  assert.throws(() => formatLapTime(4, 1.5), RangeError);
+  assert.throws(() => formatLapTime(4, Number.NaN), RangeError);
+});

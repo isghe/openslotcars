@@ -101,3 +101,37 @@ kbd {
   font: inherit;
   font-size: 0.9em;
 }
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.tile {
+  padding: 8px 12px;
+  border: 1px solid #3a4250;
+  border-radius: 8px;
+  background: #161b21;
+}
+
+.tile dt {
+  color: var(--page-muted);
+  font-size: 0.85rem;
+}
+
+.tile dd {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  /* Digits of equal width, so the running time does not jitter. */
+  font-variant-numeric: tabular-nums;
+}
+
+.announcer {
+  min-height: 1.5em;
+  margin: 0 0 12px;
+  color: var(--page-text);
+}

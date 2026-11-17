@@ -139,18 +139,25 @@ export function currentLapTime(timer, now) {
 }
 
 /**
- * Formats a lap time with millisecond precision: "4.213 s" below one minute
- * and "1:04.213" from one minute on.
+ * Formats a lap time: "4.213 s" below one minute and "1:04.213" from one
+ * minute on. The default precision is the millisecond.
+ * @param {number} seconds Time in seconds, zero or more.
+ * @param {number} [digits] Decimal digits, from 1 to 3.
  */
-export function formatLapTime(seconds) {
+export function formatLapTime(seconds, digits = 3) {
   if (!Number.isFinite(seconds) || seconds < 0) {
     throw new RangeError(`a lap time must be a finite number of seconds, zero or more, got ${seconds}`);
   }
-  const totalMilliseconds = Math.round(seconds * 1000);
-  const minutes = Math.floor(totalMilliseconds / 60000);
-  const rest = totalMilliseconds - minutes * 60000;
-  const wholeSeconds = Math.floor(rest / 1000);
-  const milliseconds = String(rest % 1000).padStart(3, '0');
-  if (minutes === 0) return `${wholeSeconds}.${milliseconds} s`;
-  return `${minutes}:${String(wholeSeconds).padStart(2, '0')}.${milliseconds}`;
+  if (!Number.isInteger(digits) || digits < 1 || digits > 3) {
+    throw new RangeError(`digits must be an integer from 1 to 3, got ${digits}`);
+  }
+  const unitsPerSecond = 10 ** digits;
+  const totalUnits = Math.round(seconds * unitsPerSecond);
+  const unitsPerMinute = 60 * unitsPerSecond;
+  const minutes = Math.floor(totalUnits / unitsPerMinute);
+  const rest = totalUnits - minutes * unitsPerMinute;
+  const wholeSeconds = Math.floor(rest / unitsPerSecond);
+  const fraction = String(rest % unitsPerSecond).padStart(digits, '0');
+  if (minutes === 0) return `${wholeSeconds}.${fraction} s`;
+  return `${minutes}:${String(wholeSeconds).padStart(2, '0')}.${fraction}`;
 }
