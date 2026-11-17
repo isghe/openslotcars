@@ -9,7 +9,11 @@ import { createStaticServer, resolveInsideRoot } from '../scripts/serve.mjs';
 let workDir;
 let server;
 let port;
-let fileLinkCreated = false;
+// Why the test with a link to a single file is skipped, or `null` if it runs.
+let fileLinkSkipReason = null;
+
+// Errors that mean "this system does not allow it" and not "the setup is wrong".
+const MISSING_PRIVILEGE = ['EPERM', 'EACCES'];
 
 before(async () => {
   workDir = await mkdtemp(path.join(tmpdir(), 'openslotcars-serve-'));
@@ -41,12 +45,13 @@ before(async () => {
   await symlink(path.join(site, '.hidden'), path.join(site, 'alias'), 'junction');
   await symlink(site, path.join(workDir, 'site-link'), 'junction');
   // A link to a single file may need a privilege on Windows: the test that
-  // uses it is skipped when it cannot be created.
+  // uses it is skipped only when that privilege is missing. Any other error is
+  // a problem of the setup and must make the tests fail, not hide the case.
   try {
     await symlink(path.join(workDir, 'secret.txt'), path.join(site, 'secret-link.txt'), 'file');
-    fileLinkCreated = true;
-  } catch {
-    fileLinkCreated = false;
+  } catch (error) {
+    if (!MISSING_PRIVILEGE.includes(error.code)) throw error;
+    fileLinkSkipReason = `this system does not allow creating links to files (${error.code})`;
   }
 
   server = createStaticServer({ root: site });
@@ -185,8 +190,8 @@ test('a link to a folder outside the root does not give access to its index', as
 });
 
 test('a link to a single file outside the root is not followed', async (t) => {
-  if (!fileLinkCreated) {
-    t.skip('this system does not allow creating links to files');
+  if (fileLinkSkipReason !== null) {
+    t.skip(fileLinkSkipReason);
     return;
   }
   const response = await rawRequest('/secret-link.txt');
