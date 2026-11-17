@@ -1,11 +1,15 @@
 # OpenSlotCars
 
-**OpenSlotCars** è un progetto open source per la simulazione di corse automobilistiche su piste elettriche (*slot cars*), interamente eseguibile nel browser.
+**OpenSlotCars** is an open source project for simulating slot car racing on electric tracks, running entirely in the browser.
 
-Il simulatore utilizza una visuale bidimensionale dall'alto e riproduce il comportamento delle automobiline vincolate alle corsie di un circuito, modellandone accelerazione, frenata, attrito, forza centrifuga e possibilità di uscita dalla pista.
+The simulator uses a two-dimensional top-down view and reproduces the behavior of small cars bound to the lanes of a circuit, modeling acceleration, braking, friction, centrifugal force and the possibility of leaving the track.
 
-Il progetto prevede la realizzazione di circuiti mediante elementi modulari, la gestione di più automobiline, il controllo dell'acceleratore, il cronometraggio dei giri e la simulazione di gare contro avversari controllati dal computer.
+The project plans to build circuits from modular pieces, to handle several cars, to control the throttle, to time laps and to simulate races against computer-controlled opponents.
 
-L'architettura è interamente lato client, basata su JavaScript e tecnologie web native, senza dipendenze da framework applicativi né necessità di un server per l'esecuzione della simulazione.
+The architecture is entirely client-side, based on JavaScript and native web technologies, with no dependency on application frameworks and no need for a server to run the simulation.
 
-L'obiettivo è realizzare un simulatore leggero, estensibile e accessibile, che unisca il divertimento delle slot cars alla sperimentazione con la geometria dei circuiti e la fisica del movimento.
+The goal is a lightweight, extensible and accessible simulator that combines the fun of slot cars with experimenting with circuit geometry and the physics of motion.
+
+## License
+
+Released under the [MIT License](LICENSE).
