@@ -489,6 +489,24 @@ test('the scrub deceleration never exceeds the grip of the rear wheels', () => {
   assert.equal(scrubDeceleration(2, 50), REAR_GRIP);
 });
 
+test('the scrub deceleration stays within the rear grip for any finite speeds, even huge ones', () => {
+  // The product grip * slide would overflow here, though the ratio is one half.
+  assert.equal(scrubDeceleration(1e308, 5e307), REAR_GRIP / 2);
+  assert.equal(scrubDeceleration(1e308, -5e307), REAR_GRIP / 2);
+  near(scrubDeceleration(1e308, 1e307), REAR_GRIP / 10, 1e-12);
+  assert.equal(scrubDeceleration(1e308, 1e308), REAR_GRIP);
+  assert.equal(scrubDeceleration(1, 1e308), REAR_GRIP);
+  // The other end of the range: a ratio that is tiny, but not zero.
+  const tiny = scrubDeceleration(1e300, 1e-300);
+  assert.ok(tiny >= 0 && tiny < 1e-290, `got ${tiny}`);
+  for (const speed of [1e-300, 1e-10, 1, 1e10, 1e300, Number.MAX_VALUE]) {
+    for (const ratio of [1e-9, 0.25, 0.5, 0.999999, 1, 3]) {
+      const value = scrubDeceleration(speed, Math.min(Number.MAX_VALUE, speed * ratio));
+      assert.ok(Number.isFinite(value) && value >= 0 && value <= REAR_GRIP, `speed ${speed} ratio ${ratio}: ${value}`);
+    }
+  }
+});
+
 test('the scrub deceleration follows the parameters and rejects invalid arguments', () => {
   const grippy = withParams({ maxLateralAcceleration: 24 });
   near(scrubDeceleration(2, 0.5, grippy), 2 * scrubDeceleration(2, 0.5), 1e-12);

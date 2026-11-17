@@ -263,7 +263,9 @@ export function scrubDeceleration(speed, rearSlip, params = DEFAULT_PARAMS) {
   // From here on the whole grip brakes the car; returning it as it is keeps
   // the cap exact, where `grip * sliding / sliding` can round above it.
   if (sliding >= speed) return grip;
-  return (grip * sliding) / speed;
+  // The ratio is below 1, so the product cannot go above the grip; the other
+  // order, `grip * sliding / speed`, overflows for huge but finite arguments.
+  return grip * (sliding / speed);
 }
 
 /**
