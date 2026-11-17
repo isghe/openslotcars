@@ -12,10 +12,17 @@
  *
  * The server listens on the loopback address only and serves the project
  * folder. Paths with dot segments (such as `.git`) are never served.
+ *
+ * Links (symbolic links and Windows junctions) are followed only while they
+ * stay inside the served folder: both the folder and every file are resolved
+ * to their real location, which must lie inside the real folder and must not
+ * go through a dot segment either. The check and the read are two separate
+ * steps, so this is not a defense against another process that changes the
+ * served folder at the very moment of a request.
  */
 
 import { createServer } from 'node:http';
-import { stat, readFile } from 'node:fs/promises';
+import { stat, readFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -71,11 +78,31 @@ export function resolveInsideRoot(root, pathname) {
 }
 
 /**
+ * Resolves a path to its real location and accepts it only if it lies inside
+ * the real root and is allowed there (see `resolveInsideRoot`).
+ * @param {string} realRoot The root, already resolved to its real location.
+ * @param {string} candidate A path that may go through links.
+ * @returns {Promise<string|null>} The real path, or `null` if the file does
+ *   not exist or is not allowed.
+ */
+async function resolveReal(realRoot, candidate) {
+  const real = await realpath(candidate).catch(() => null);
+  if (real === null) return null;
+  const relative = path.relative(realRoot, real);
+  if (relative === '') return real;
+  if (relative.startsWith('..') || path.isAbsolute(relative)) return null;
+  // The same rule as for the requested path, applied to where the path really
+  // leads: a link must not be a way into a dot folder.
+  return resolveInsideRoot(realRoot, relative.split(path.sep).join('/')) === null ? null : real;
+}
+
+/**
  * Creates the HTTP server, without starting it.
  * @param {{root: string}} options Folder to serve.
  */
 export function createStaticServer({ root }) {
   const base = path.resolve(root);
+  const realRootPromise = realpath(base).catch(() => null);
 
   return createServer(async (request, response) => {
     try {
@@ -84,30 +111,38 @@ export function createStaticServer({ root }) {
         return;
       }
 
+      let url;
       let pathname;
       try {
-        pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
+        url = new URL(request.url, 'http://localhost');
+        pathname = decodeURIComponent(url.pathname);
       } catch {
         sendText(response, 400, 'Bad request\n');
         return;
       }
 
-      let file = resolveInsideRoot(base, pathname);
-      if (file === null) {
+      const lexical = resolveInsideRoot(base, pathname);
+      const realRoot = await realRootPromise;
+      if (lexical === null || realRoot === null) {
         sendText(response, 404, 'Not found\n');
         return;
       }
 
-      let info = await stat(file).catch(() => null);
+      let file = await resolveReal(realRoot, lexical);
+      let info = file === null ? null : await stat(file).catch(() => null);
       if (info?.isDirectory()) {
         if (!pathname.endsWith('/')) {
-          sendText(response, 301, '', { Location: `${pathname}/` });
+          // The encoded path of the URL is kept as it came, so names with `#`
+          // or `%` still lead to the folder; the leading slashes are reduced
+          // to one, because `//host` would be read as another host.
+          const encoded = url.pathname.replace(/^\/+/, '/');
+          sendText(response, 301, '', { Location: `${encoded}/${url.search}` });
           return;
         }
-        file = path.join(file, 'index.html');
-        info = await stat(file).catch(() => null);
+        file = await resolveReal(realRoot, path.join(file, 'index.html'));
+        info = file === null ? null : await stat(file).catch(() => null);
       }
-      if (!info?.isFile()) {
+      if (file === null || !info?.isFile()) {
         sendText(response, 404, 'Not found\n');
         return;
       }
