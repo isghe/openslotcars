@@ -54,6 +54,16 @@ export function formatTiming(summary) {
  * Events that happened between two worlds, in a reasonable order: laps closed
  * first, then changes of the car status. When `after` is older than `before`
  * the race was restarted in between and there is nothing to compare.
+ *
+ * Only the two worlds are compared, not the steps in between, so the events
+ * are found as long as the observations are close enough:
+ * - laps are never lost, however far apart the observations are, because they
+ *   are found by counting;
+ * - a change of the car status is seen if it is still in place at the second
+ *   world. If the car leaves the track and is back on it between two
+ *   observations (by default that takes the 1.5 s of the recovery time), both
+ *   changes go unnoticed. The page observes every frame, and a frame never
+ *   advances the simulation by more than a fraction of a second.
  * @returns {Array<object>} Events of three kinds:
  *   `{type: 'lap', lap, isBest}`, `{type: 'exit', countsAgainstLap}` and
  *   `{type: 'recovered'}`.

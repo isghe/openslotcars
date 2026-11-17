@@ -49,11 +49,21 @@ test('the lanes fit inside the track width', () => {
   assert.equal(oval.trackWidth, 0.2);
 });
 
-test('the definition cannot be modified by accident', () => {
+test('the definition cannot be modified by accident, at any level', () => {
   assert.ok(Object.isFrozen(OVAL));
   assert.ok(Object.isFrozen(OVAL.pieces));
   assert.ok(Object.isFrozen(OVAL.lanes));
   assert.ok(Object.isFrozen(OVAL.start));
+  for (const piece of OVAL.pieces) assert.ok(Object.isFrozen(piece));
+
+  // Assignments fail loudly (modules run in strict mode) and change nothing.
+  const before = OVAL.pieces[0].length;
+  assert.throws(() => { OVAL.pieces[0].length = before + 0.1; }, TypeError);
+  assert.throws(() => { OVAL.pieces[1].radius = 1; }, TypeError);
+  assert.throws(() => { OVAL.pieces.push({}); }, TypeError);
+  assert.throws(() => { OVAL.lanes.inner = 0; }, TypeError);
+  assert.equal(OVAL.pieces[0].length, before);
+  assert.doesNotThrow(() => buildCircuit(OVAL));
 });
 
 test('building a circuit twice gives independent equal results', () => {

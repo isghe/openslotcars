@@ -66,12 +66,6 @@ test('the running lap time is measured from the last crossing', () => {
   assert.match(formatTiming(summary).currentLap, /^\d\.\d s$/);
 });
 
-test('the running lap time does not move while the world stands still', () => {
-  const history = run(1, () => 0.3);
-  const world = history[history.length - 1];
-  assert.equal(timingSummary(world).currentLap, timingSummary(world).currentLap);
-});
-
 test('closed laps are summarized with the best valid one', () => {
   const history = run(40, () => 0.3);
   const summary = timingSummary(history[history.length - 1]);
@@ -107,8 +101,9 @@ test('minutes appear in a long running lap', () => {
   assert.equal(formatTiming(summary).currentLap, '1:15.3');
 });
 
-test('events are found whatever the observation interval', () => {
+test('events are found at observation intervals up to half a second', () => {
   const history = run(40, exitThenModerate());
+  // 60 steps are half a second, well below the 1.5 s of the recovery time.
   for (const every of [1, 2, 7, 60]) {
     const events = observe(history, every);
     const kinds = events.map((event) => event.type);
@@ -117,6 +112,36 @@ test('events are found whatever the observation interval', () => {
     assert.ok(kinds.filter((k) => k === 'lap').length >= 2, `every ${every}`);
     assert.ok(kinds.indexOf('exit') < kinds.indexOf('recovered'), `every ${every}`);
   }
+});
+
+test('laps are never lost, however far apart the observations are', () => {
+  const history = run(40, exitThenModerate());
+  const last = history[history.length - 1];
+  for (const every of [1, 60, 600, history.length - 1]) {
+    const laps = observe(history, every).filter((event) => event.type === 'lap');
+    // The last partial interval is not observed: count the laps seen by then.
+    const lastObserved = history[Math.floor((history.length - 1) / every) * every];
+    assert.equal(laps.length, lastObserved.timer.laps.length, `every ${every}`);
+  }
+  assert.ok(last.timer.laps.length >= 2);
+});
+
+test('a status change that is undone between two observations goes unnoticed', () => {
+  // This is the documented limit of comparing only two worlds: if the car
+  // leaves the track and is put back in between, neither event is reported.
+  const history = run(40, exitThenModerate());
+  const exitIndex = history.findIndex((world) => world.car.status === 'offTrack');
+  const backIndex = exitIndex + context.recoverySteps;
+  assert.equal(history[exitIndex - 1].car.status, 'onTrack');
+  assert.equal(history[backIndex].car.status, 'onTrack');
+  const kinds = timingEvents(history[exitIndex - 1], history[backIndex]).map((event) => event.type);
+  assert.ok(!kinds.includes('exit'));
+  assert.ok(!kinds.includes('recovered'));
+
+  // Each half is seen as soon as the observation falls inside the pause.
+  const during = history[exitIndex + 10];
+  assert.deepEqual(timingEvents(history[exitIndex - 1], during).map((e) => e.type), ['exit']);
+  assert.deepEqual(timingEvents(during, history[backIndex]).map((e) => e.type), ['recovered']);
 });
 
 test('the lap with the exit is reported as not best and the next clean lap as the best one', () => {

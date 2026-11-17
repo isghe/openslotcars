@@ -244,3 +244,29 @@ test('an out-of-range interpolation fraction is rejected', () => {
   assert.throws(() => interpolateWorld(world, world, 1.1), RangeError);
   assert.throws(() => interpolateWorld(world, world, Number.NaN), RangeError);
 });
+
+test('a lap time converges as the physics step gets smaller', () => {
+  // The interpolation of the finish line crossing removes the rounding to a
+  // whole step, but the accuracy of a lap still depends on the physics step:
+  // the integration of the motion is only first-order accurate.
+  const lane = circuit.lanes.inner;
+  function firstLap(dt) {
+    const stepContext = createContext({ lane, rules: { dt } });
+    let world = createWorld(stepContext);
+    for (let i = 0; i < 200000 && world.timer.laps.length === 0; i += 1) {
+      world = stepWorld(world, { throttle: 0.3 }, stepContext);
+    }
+    return world.timer.laps[0].time;
+  }
+
+  const reference = firstLap(1 / 960);
+  const errors = [30, 60, 120, 240].map((n) => Math.abs(firstLap(1 / n) - reference));
+  // Each halving of the step shrinks the error.
+  for (let i = 1; i < errors.length; i += 1) {
+    assert.ok(errors[i] < errors[i - 1], `errors ${errors.join(', ')}`);
+  }
+  // At the step used by the game the error is a few milliseconds (measured:
+  // 2.7 ms against the finest step); at 1/30 s it is more than ten.
+  assert.ok(errors[2] < 0.005, `error at 1/120 s: ${errors[2]}`);
+  assert.ok(errors[0] > 0.01, `error at 1/30 s: ${errors[0]}`);
+});

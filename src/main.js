@@ -1,27 +1,24 @@
 /**
- * Entry point: wires the simulation to the page.
+ * Entry point: wires the game to the page.
  *
- * Every animation frame the real time elapsed is turned into a whole number of
- * fixed simulation steps; the drawing is interpolated between the last two
- * states, so it is smooth at any screen refresh rate. The throttle ramp of the
- * controls advances once per simulation step, so the feel of the game does not
- * depend on the screen either.
+ * The rules of a frame (fixed steps, pause, restart) are in `core/game.js`;
+ * here the page elements are connected to them. The drawing is interpolated
+ * between the last two states, so it is smooth at any screen refresh rate.
  */
 
 import { OVAL, buildCircuit } from './core/circuits.js';
 import { createControls } from './core/controls.js';
-import {
-  createContext,
-  createWorld,
-  stepWorld,
-  interpolateWorld,
-} from './core/simulation.js';
-import { createStepper } from './core/stepper.js';
+import { createGame } from './core/game.js';
+import { createContext } from './core/simulation.js';
 import { createHud } from './ui/hud.js';
 import { bindInput } from './ui/input.js';
 import { createRenderer } from './ui/render.js';
 
 const canvas = document.getElementById('track');
+const throttleButton = document.getElementById('throttle');
+const pauseButton = document.getElementById('pause');
+const restartButton = document.getElementById('restart');
+
 const hud = createHud({
   currentLap: document.getElementById('current-lap'),
   lastLap: document.getElementById('last-lap'),
@@ -29,21 +26,15 @@ const hud = createHud({
   laps: document.getElementById('laps'),
   announcer: document.getElementById('announcer'),
 });
-const throttleButton = document.getElementById('throttle');
-const pauseButton = document.getElementById('pause');
-const restartButton = document.getElementById('restart');
 
 const circuit = buildCircuit(OVAL);
 const context = createContext({ lane: circuit.lanes.inner });
-const stepper = createStepper({ dt: context.dt });
-const renderer = createRenderer(canvas, circuit, context);
 const controls = createControls();
+const game = createGame({ context, controls });
+const renderer = createRenderer(canvas, circuit, context);
 bindInput({ controls, throttleButton, pauseButton, restartButton });
 
-let world = createWorld(context);
-let previous = world;
-let lastFrameTime = null;
-hud.update(world);
+hud.update(game.world);
 
 /** Keeps the pressed state of the buttons in line with the controls. */
 function syncButtons() {
@@ -51,47 +42,22 @@ function syncButtons() {
   pauseButton.setAttribute('aria-pressed', String(controls.paused));
 }
 
-function restart() {
-  world = createWorld(context);
-  previous = world;
-  stepper.reset();
-  controls.resetThrottle();
-  controls.setPaused(false);
-  hud.restart(world);
-}
-
 function frame(now) {
-  if (controls.takeRestart()) restart();
+  const result = game.frame(now);
+  if (result.restarted) hud.restart(result.world);
   syncButtons();
 
-  if (controls.paused) {
-    // No time passes while paused: start over from the next frame.
-    lastFrameTime = null;
-    stepper.reset();
-    renderer.draw(world, { paused: true });
-    requestAnimationFrame(frame);
-    return;
+  if (result.paused) {
+    renderer.draw(result.drawn, { paused: true });
+  } else {
+    hud.update(result.world);
+    renderer.draw(result.drawn);
   }
-
-  const elapsed = lastFrameTime === null ? 0 : (now - lastFrameTime) / 1000;
-  lastFrameTime = now;
-
-  const { steps, alpha } = stepper.advance(elapsed);
-  for (let i = 0; i < steps; i += 1) {
-    controls.step(context.dt);
-    previous = world;
-    world = stepWorld(world, { throttle: controls.throttle }, context);
-  }
-  hud.update(world);
-  renderer.draw(interpolateWorld(previous, world, alpha));
   requestAnimationFrame(frame);
 }
 
 // After the page was hidden the elapsed time is meaningless: start over.
-document.addEventListener('visibilitychange', () => {
-  lastFrameTime = null;
-  stepper.reset();
-});
+document.addEventListener('visibilitychange', () => game.resetClock());
 
 new ResizeObserver(() => renderer.resize()).observe(canvas);
 requestAnimationFrame(frame);

@@ -24,16 +24,17 @@ function assertPositiveFinite(value, name) {
 }
 
 /**
- * Creates a straight piece.
+ * Creates a straight piece. The piece is frozen, so a circuit definition made
+ * of such pieces cannot be changed by accident.
  * @param {number} length Length in meters.
  */
 export function straight(length) {
   assertPositiveFinite(length, 'length');
-  return { type: 'straight', length };
+  return Object.freeze({ type: 'straight', length });
 }
 
 /**
- * Creates a circular arc piece.
+ * Creates a circular arc piece. The piece is frozen, like those of `straight`.
  * @param {number} radius Radius of the center line in meters.
  * @param {number} angle Swept angle in radians: positive turns left,
  *   negative turns right.
@@ -43,7 +44,7 @@ export function curve(radius, angle) {
   if (!Number.isFinite(angle) || angle === 0) {
     throw new RangeError(`angle must be a non-zero finite number, got ${angle}`);
   }
-  return { type: 'curve', radius, angle };
+  return Object.freeze({ type: 'curve', radius, angle });
 }
 
 /** Radius of the lane with the given offset on a curve piece. */

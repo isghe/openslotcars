@@ -199,3 +199,12 @@ test('invalid pieces and offsets are rejected', () => {
   assert.throws(() => createLane(track, Number.NaN), RangeError);
   assert.throws(() => createLane(track, 0).sample(0), RangeError);
 });
+
+test('pieces are frozen and building a track does not change them', () => {
+  const pieces = ovalPieces();
+  for (const piece of pieces) assert.ok(Object.isFrozen(piece));
+  assert.throws(() => { pieces[0].length = 2; }, TypeError);
+  const snapshot = JSON.stringify(pieces);
+  createTrack(pieces);
+  assert.equal(JSON.stringify(pieces), snapshot);
+});

@@ -58,14 +58,15 @@ The game pauses by itself when the window loses the focus or the page is hidden.
 npm test
 ```
 
-This runs the tests with the test runner built into Node (`node --test`). They cover the geometry, the physics, the lap timer, the simulation, the controls, the content of the timing panel, the static server and the handling of keyboard, pointer and focus events (run against simple stand-ins for the page, not a real browser). The drawing on the canvas, the main loop and the connection of the timing panel to the page have no automated tests and are checked by hand in a browser.
+This runs the tests with the test runner built into Node (`node --test`). They cover the geometry, the physics, the lap timer, the simulation, the logic of each frame (pause and restart included), the controls, the content of the timing panel, the static server and the handling of keyboard, pointer and focus events (run against simple stand-ins for the page, not a real browser). The drawing on the canvas, the wiring in `src/main.js` and the connection of the timing panel to the page have no automated tests and are checked by hand in a browser.
 
 ## How it works
 
 - **Geometry** (`src/core/geometry.js`): a circuit is a closed chain of straights and circular arcs. The position, the heading and the curvature of every lane are computed in closed form, and every lane has its own length.
 - **Physics** (`src/core/physics.js`): the motor pushes less as the car speeds up, and there are rolling friction and air drag. In a curve the car needs a lateral acceleration of `v² · curvature`; above the grip limit it leaves the track. All values are parameters with their units documented in the file.
 - **Simulation** (`src/core/simulation.js`, `src/core/stepper.js`): the world advances in fixed steps of 1/120 s, whatever the frame rate, so results are deterministic. The drawing is interpolated between two steps.
-- **Lap timing** (`src/core/lapTimer.js`): the instant of each crossing of the finish line is interpolated inside the step, so lap times do not depend on the step size.
+- **Lap timing** (`src/core/lapTimer.js`): the instant of each crossing of the finish line is interpolated inside the step, which removes the rounding of lap times to a whole step. Their accuracy still depends on the physics step, because the motion is integrated only to first order: for a lap at a constant throttle the error against a much finer step is about 2.7 ms at the default 1/120 s and more than 10 ms at 1/30 s (see `test/simulation.test.js`).
+- **Frame logic** (`src/core/game.js`): what happens in each animation frame, including the pause (no time passes, and the time spent in pause is not made up for) and the restart.
 - **Page** (`src/ui/`, `src/main.js`): the canvas drawing, the input handling and the timing panel.
 
 The logic in `src/core/` is pure: it does not touch the page, read a clock or use random numbers, so it also runs in Node.
@@ -76,7 +77,7 @@ The logic in `src/core/` is pure: it does not touch the page, read a clock or us
 index.html, style.css, favicon.svg   the page
 src/main.js                          entry point and main loop
 src/core/                            pure logic: geometry, circuits, physics,
-                                     simulation, stepper, lap timer, controls, timing
+                                     simulation, stepper, game, lap timer, controls, timing
 src/ui/                              canvas drawing, input, timing panel
 scripts/serve.mjs                    local static file server
 test/                                automated tests
