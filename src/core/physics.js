@@ -26,7 +26,9 @@
  * the tail rolls behind the pin, slightly inside the curve. Above it the tail
  * slides out, and `hasSpunOut` tells when the body has turned so far that the
  * car would leave the track. `stepYaw` does not move the car along the lane:
- * the caller gives it the speed, the curvature and the turn of the lane.
+ * the caller gives it the speed, the curvature and the turn of the lane. A
+ * sliding tail also costs speed: `scrubDeceleration` gives the deceleration,
+ * which `stepLongitudinal` takes as an extra resistance.
  *
  * This module is pure logic: no DOM, no clock, no randomness.
  */
@@ -144,13 +146,19 @@ export function terminalSpeed(throttle, params = DEFAULT_PARAMS) {
  * @param {number} throttle Throttle from 0 to 1.
  * @param {number} dt Time step in seconds.
  * @param {typeof DEFAULT_PARAMS} [params]
+ * @param {number} [resistance] Extra deceleration in m/s^2, zero or more, for
+ *   instance the one that `scrubDeceleration` gives. With zero the result is
+ *   identical to the plain step.
  * @returns {{distance: number, speed: number}} The new state.
  */
-export function stepLongitudinal(state, throttle, dt, params = DEFAULT_PARAMS) {
+export function stepLongitudinal(state, throttle, dt, params = DEFAULT_PARAMS, resistance = 0) {
   if (!Number.isFinite(dt) || dt <= 0) {
     throw new RangeError(`dt must be a positive finite number, got ${dt}`);
   }
-  const acceleration = netAcceleration(state.speed, throttle, params);
+  if (!Number.isFinite(resistance) || resistance < 0) {
+    throw new RangeError(`resistance must be a finite number, zero or more, got ${resistance}`);
+  }
+  const acceleration = netAcceleration(state.speed, throttle, params) - resistance;
   const speed = Math.max(0, state.speed + acceleration * dt);
   return { distance: state.distance + speed * dt, speed };
 }
@@ -224,6 +232,40 @@ export function hasSpunOut(slip, params = DEFAULT_PARAMS) {
   return Math.abs(checkFinite('slip', slip)) > params.maxSlipAngle;
 }
 
+/** Lateral grip of the rear wheels per unit of mass, m/s^2. */
+function rearGrip(params) {
+  return (params.maxLateralAcceleration * params.pinToCenterOfMass) / params.pinToRearAxle;
+}
+
+/**
+ * Deceleration that a sliding tail takes from the car.
+ *
+ * The rear wheels slide sideways at `rearSlip` and the friction force, at most
+ * the rear grip, works against that slide. That work is taken from the motion
+ * of the car, so the deceleration is the grip times the sliding speed divided
+ * by the speed of the car. It is capped at the rear grip, which is the whole
+ * force when the slide is as fast as the car or faster.
+ * @param {number} speed Speed of the car in m/s, zero or more.
+ * @param {number} rearSlip Sideways speed of the rear axle in m/s, as `stepYaw`
+ *   gives it; zero while the wheels hold.
+ * @returns {number} Deceleration in m/s^2: zero when the tail holds or the car
+ *   is at rest, never above the rear grip.
+ */
+export function scrubDeceleration(speed, rearSlip, params = DEFAULT_PARAMS) {
+  checkFinite('speed', speed);
+  checkFinite('rearSlip', rearSlip);
+  if (speed < 0) {
+    throw new RangeError(`speed must not be negative, got ${speed}`);
+  }
+  const sliding = Math.abs(rearSlip);
+  if (speed === 0 || sliding === 0) return 0;
+  const grip = rearGrip(params);
+  // From here on the whole grip brakes the car; returning it as it is keeps
+  // the cap exact, where `grip * sliding / sliding` can round above it.
+  if (sliding >= speed) return grip;
+  return (grip * sliding) / speed;
+}
+
 /**
  * Advances the rotation of the body about the guide pin by one fixed time step.
  *
@@ -289,7 +331,7 @@ export function stepYaw(state, motion, dt, params = DEFAULT_PARAMS) {
     );
   }
   const inertia = b * b + params.bodyRadiusOfGyration * params.bodyRadiusOfGyration;
-  const grip = (params.maxLateralAcceleration * b) / l;
+  const grip = rearGrip(params);
 
   const free = yawRate + dt * (b / inertia) * speed * speed * curvature * Math.cos(slip);
   const rolling = (-speed * Math.sin(slip)) / l;

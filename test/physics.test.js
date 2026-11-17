@@ -12,6 +12,7 @@ import {
   stepOffTrack,
   stepYaw,
   hasSpunOut,
+  scrubDeceleration,
 } from '../src/core/physics.js';
 
 const DT = 1 / 120;
@@ -449,4 +450,113 @@ test('the spin-out test is strict, symmetric and uses the angle limit', () => {
   assert.equal(hasSpunOut(0.4, strict), true);
   assert.equal(hasSpunOut(0.4), false);
   assert.throws(() => hasSpunOut(Number.NaN), RangeError);
+});
+
+// A sliding tail costs speed.
+
+const REAR_GRIP = (GRIP * DEFAULT_PARAMS.pinToCenterOfMass) / REAR;
+
+test('a tail that holds, or a car at rest, costs no speed', () => {
+  near(REAR_GRIP, 6, 1e-12);
+  assert.equal(scrubDeceleration(2, 0), 0);
+  assert.equal(scrubDeceleration(0, 3), 0);
+  assert.equal(scrubDeceleration(0, 0), 0);
+});
+
+test('the scrub deceleration is the friction work of the sideways slide divided by the speed', () => {
+  // Below the speed of the car: grip * u / v.
+  near(scrubDeceleration(2, 0.5), (REAR_GRIP * 0.5) / 2, 1e-12);
+  near(scrubDeceleration(4, 1), (REAR_GRIP * 1) / 4, 1e-12);
+  // The power taken from the car is the grip force times the sliding speed.
+  near(scrubDeceleration(3, 0.9) * 3, REAR_GRIP * 0.9, 1e-12);
+  // It does not depend on which side the tail slides to.
+  assert.equal(scrubDeceleration(2, -0.5), scrubDeceleration(2, 0.5));
+});
+
+test('the scrub deceleration never exceeds the grip of the rear wheels', () => {
+  for (const speed of [0.01, 0.5, 1, 2, 4.4]) {
+    let previous = 0;
+    for (const sliding of [0.001, 0.1, 0.5, 1, 2, 4.4, 10, 1000]) {
+      const value = scrubDeceleration(speed, sliding);
+      assert.ok(value > 0, `speed ${speed} slide ${sliding}`);
+      assert.ok(value <= REAR_GRIP, `speed ${speed} slide ${sliding}`);
+      assert.ok(value >= previous, `speed ${speed} slide ${sliding}`);
+      previous = value;
+    }
+  }
+  // When the slide is as fast as the car or faster, the whole grip brakes it.
+  assert.equal(scrubDeceleration(2, 2), REAR_GRIP);
+  assert.equal(scrubDeceleration(2, 50), REAR_GRIP);
+});
+
+test('the scrub deceleration follows the parameters and rejects invalid arguments', () => {
+  const grippy = withParams({ maxLateralAcceleration: 24 });
+  near(scrubDeceleration(2, 0.5, grippy), 2 * scrubDeceleration(2, 0.5), 1e-12);
+  const short = withParams({ pinToRearAxle: 0.04 });
+  near(scrubDeceleration(2, 0.5, short), 2 * scrubDeceleration(2, 0.5), 1e-12);
+  assert.throws(() => scrubDeceleration(-1, 0.5), RangeError);
+  assert.throws(() => scrubDeceleration(Number.NaN, 0.5), RangeError);
+  assert.throws(() => scrubDeceleration(2, Number.NaN), RangeError);
+  assert.throws(() => scrubDeceleration(2, Number.POSITIVE_INFINITY), RangeError);
+});
+
+test('an extra resistance slows the car and, at zero, changes nothing at all', () => {
+  const sequence = [1, 1, 0.5, 0, 0, 1, 0.3, 1];
+  let plain = { distance: 0, speed: 0 };
+  let zero = { distance: 0, speed: 0 };
+  for (let i = 0; i < 2000; i += 1) {
+    plain = stepLongitudinal(plain, sequence[i % sequence.length], DT);
+    zero = stepLongitudinal(zero, sequence[i % sequence.length], DT, DEFAULT_PARAMS, 0);
+    assert.deepStrictEqual(zero, plain, `step ${i}`);
+  }
+
+  const state = { distance: 1, speed: 2 };
+  const free = stepLongitudinal(state, 0.5, DT);
+  const slowed = stepLongitudinal(state, 0.5, DT, DEFAULT_PARAMS, 3);
+  near(slowed.speed, free.speed - 3 * DT, 1e-12);
+  // The new speed moves the car, as in the plain step.
+  near(slowed.distance, state.distance + slowed.speed * DT, 1e-12);
+  assert.ok(slowed.distance < free.distance);
+});
+
+test('an extra resistance never reverses the car or holds a moving car back from rest', () => {
+  const stopped = stepLongitudinal({ distance: 5, speed: 0.01 }, 0, DT, DEFAULT_PARAMS, 50);
+  assert.deepEqual(stopped, { distance: 5, speed: 0 });
+  // At rest, a resistance above the push keeps the car at rest.
+  const held = stepLongitudinal({ distance: 5, speed: 0 }, 1, DT, DEFAULT_PARAMS, 50);
+  assert.deepEqual(held, { distance: 5, speed: 0 });
+});
+
+test('the extra resistance is validated', () => {
+  const state = { distance: 0, speed: 1 };
+  assert.throws(() => stepLongitudinal(state, 1, DT, DEFAULT_PARAMS, -1), RangeError);
+  assert.throws(() => stepLongitudinal(state, 1, DT, DEFAULT_PARAMS, Number.NaN), RangeError);
+  assert.throws(() => stepLongitudinal(state, 1, DT, DEFAULT_PARAMS, Number.POSITIVE_INFINITY), RangeError);
+});
+
+test('a car that slides its tail on a curve is slowed by the scrub, step after step', () => {
+  // The same loop twice, on a constant curve at half throttle: the speed moves
+  // the pin, the pin turns the body, and the slide of the tail may slow the car.
+  const drive = (useScrub) => {
+    let yaw = { slip: 0, yawRate: 0, rearSlip: 0 };
+    let car = { distance: 0, speed: 2.2 };
+    let scrubbed = 0;
+    for (let i = 0; i < 360; i += 1) {
+      const resistance = useScrub ? scrubDeceleration(car.speed, yaw.rearSlip) : 0;
+      if (resistance > 0) scrubbed += 1;
+      car = stepLongitudinal(car, 0.5, DT, DEFAULT_PARAMS, resistance);
+      yaw = stepYaw(
+        yaw,
+        { speed: car.speed, curvature: INNER_CURVATURE, turn: car.speed * INNER_CURVATURE * DT },
+        DT,
+      );
+    }
+    return { car, scrubbed };
+  };
+  const plain = drive(false);
+  const scrubbing = drive(true);
+  assert.equal(plain.scrubbed, 0);
+  assert.ok(scrubbing.scrubbed > 0, 'the tail never slid');
+  assert.ok(scrubbing.car.speed < plain.car.speed, `${scrubbing.car.speed} against ${plain.car.speed}`);
+  assert.ok(scrubbing.car.speed > 0);
 });
