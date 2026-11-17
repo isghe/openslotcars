@@ -9,6 +9,13 @@
  * - On the track the car follows the longitudinal physics of `physics.js`.
  *   After every step, if the lateral acceleration needed by the curve is above
  *   the grip limit, the car leaves the track.
+ * - With the rule `tailSlide` the car is a body hinged at its guide pin. The
+ *   pin follows the lane as above, and the body turns about it: the tail
+ *   rolls behind the pin while its wheels hold, slides out above the grip
+ *   limit, and costs speed while it slides. The car leaves the track only when
+ *   the body has turned too far (`hasSpunOut`), and not at the grip limit.
+ *   The rule is off by default, and where the tail never slides the motion of
+ *   the pin is exactly the one of the plain model.
  * - Off the track the car slides straight along the tangent at the exit point
  *   and the throttle is ignored. After the recovery time a marshal puts it
  *   back on its lane at the exit point, at rest. The distance counted for the
@@ -25,7 +32,11 @@ import {
   stepLongitudinal,
   hasLostGrip,
   stepOffTrack,
+  stepYaw,
+  hasSpunOut,
+  scrubDeceleration,
 } from './physics.js';
+import { angleDifference } from './geometry.js';
 import {
   createLapTimer,
   advanceTimer,
@@ -41,6 +52,9 @@ export const DEFAULT_RULES = Object.freeze({
   // Initial distance, in meters. The car starts behind the finish line, so
   // that the first crossing starts the clock.
   startDistance: -0.1,
+  // Whether the body of the car pivots about the guide pin and the tail can
+  // slide out (see the module comment). Off, the car is a single point.
+  tailSlide: false,
 });
 
 /** Visual spin of a sliding car, in radians per meter slid. Not physical. */
@@ -62,12 +76,24 @@ export function createContext({ lane, params = DEFAULT_PARAMS, rules = {} }) {
   if (!Number.isFinite(merged.startDistance)) {
     throw new RangeError(`startDistance must be a finite number, got ${merged.startDistance}`);
   }
+  if (typeof merged.tailSlide !== 'boolean') {
+    throw new RangeError(`tailSlide must be true or false, got ${merged.tailSlide}`);
+  }
+  if (merged.tailSlide && params.freeSpeed * merged.dt >= params.pinToRearAxle) {
+    // At its top speed the car would cover the pin-to-axle distance in one
+    // step, and the tail could not settle behind the pin.
+    throw new RangeError(
+      `dt is too coarse for the tail: ${params.freeSpeed} m/s over ${merged.dt} s is not less than `
+      + `the pin-to-axle distance ${params.pinToRearAxle} m`,
+    );
+  }
   return Object.freeze({
     lane,
     laneLength: lane.length,
     params,
     dt: merged.dt,
     startDistance: merged.startDistance,
+    tailSlide: merged.tailSlide,
     recoverySteps: Math.max(1, Math.round(merged.recoveryTime / merged.dt)),
   });
 }
@@ -80,12 +106,20 @@ export function createContext({ lane, params = DEFAULT_PARAMS, rules = {} }) {
  * track, `{status: 'offTrack', distance, speed, travel, resumeStep}` where
  * `distance` is the exit point on the lane, `travel` the distance slid since
  * the exit and `resumeStep` the step at which the car is put back.
+ *
+ * With the rule `tailSlide`, `distance` and `speed` are those of the guide pin
+ * and the car also has `slip` (angle of the body to the lane, rad, positive
+ * with the nose to the left), `yawRate` (rotation speed of the body, rad/s) and
+ * `rearSlip` (sideways speed of the rear axle, m/s, zero while the tail holds),
+ * as `stepYaw` defines them. Off the track it keeps only `slip`, the angle at
+ * which it spun out.
  */
 export function createWorld(context) {
+  const aligned = context.tailSlide ? { slip: 0, yawRate: 0, rearSlip: 0 } : {};
   return {
     stepIndex: 0,
     time: 0,
-    car: { status: 'onTrack', distance: context.startDistance, speed: 0 },
+    car: { status: 'onTrack', distance: context.startDistance, speed: 0, ...aligned },
     timer: createLapTimer(),
   };
 }
@@ -109,7 +143,9 @@ export function stepWorld(world, input, context) {
   const car = world.car;
 
   if (car.status === 'onTrack') {
-    const next = stepLongitudinal(car, throttle, dt, params);
+    // The slide of the tail, known from the previous step, slows the pin down.
+    const resistance = context.tailSlide ? scrubDeceleration(car.speed, car.rearSlip, params) : 0;
+    const next = stepLongitudinal(car, throttle, dt, params, resistance);
     const { timer } = advanceTimer(world.timer, {
       previousTime,
       dt,
@@ -118,7 +154,19 @@ export function stepWorld(world, input, context) {
       laneLength: context.laneLength,
     });
 
-    if (hasLostGrip(next.speed, lane.curvatureAt(next.distance), params)) {
+    // With the rule off the car leaves the track at the grip limit. With it on,
+    // the body turns about the pin by the angle the lane turned under it.
+    let body = null;
+    let exits;
+    if (context.tailSlide) {
+      const turn = angleDifference(lane.poseAt(next.distance).heading, lane.poseAt(car.distance).heading);
+      body = stepYaw(car, { speed: next.speed, curvature: lane.curvatureAt(next.distance), turn }, dt, params);
+      exits = hasSpunOut(body.slip, params);
+    } else {
+      exits = hasLostGrip(next.speed, lane.curvatureAt(next.distance), params);
+    }
+
+    if (exits) {
       return {
         stepIndex,
         time,
@@ -131,6 +179,7 @@ export function stepWorld(world, input, context) {
           speed: next.speed,
           travel: 0,
           resumeStep: stepIndex + context.recoverySteps,
+          ...(body && { slip: body.slip }),
         },
       };
     }
@@ -138,16 +187,17 @@ export function stepWorld(world, input, context) {
       stepIndex,
       time,
       timer,
-      car: { status: 'onTrack', distance: next.distance, speed: next.speed },
+      car: { status: 'onTrack', distance: next.distance, speed: next.speed, ...body },
     };
   }
 
   if (stepIndex >= car.resumeStep) {
+    const aligned = context.tailSlide ? { slip: 0, yawRate: 0, rearSlip: 0 } : {};
     return {
       stepIndex,
       time,
       timer: world.timer,
-      car: { status: 'onTrack', distance: car.distance, speed: 0 },
+      car: { status: 'onTrack', distance: car.distance, speed: 0, ...aligned },
     };
   }
   const slid = stepOffTrack({ travel: car.travel, speed: car.speed }, dt, params);

@@ -104,8 +104,11 @@ function poseOnPiece(piece, from, offset, t) {
   };
 }
 
-/** Difference between two angles, folded into [-PI, PI). */
-function angleDifference(a, b) {
+/**
+ * Difference `a - b` between two angles in radians, folded into [-PI, PI), so
+ * that two headings on either side of the wrap at 0 differ by a small angle.
+ */
+export function angleDifference(a, b) {
   return ((((a - b + Math.PI) % TWO_PI) + TWO_PI) % TWO_PI) - Math.PI;
 }
 

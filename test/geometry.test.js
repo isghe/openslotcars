@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { straight, curve, createTrack, createLane } from '../src/core/geometry.js';
+import {
+  straight,
+  curve,
+  createTrack,
+  createLane,
+  angleDifference as foldedDifference,
+} from '../src/core/geometry.js';
 
 const EPSILON = 1e-9;
 
@@ -207,4 +213,24 @@ test('pieces are frozen and building a track does not change them', () => {
   const snapshot = JSON.stringify(pieces);
   createTrack(pieces);
   assert.equal(JSON.stringify(pieces), snapshot);
+});
+
+test('the difference of two angles is folded into [-PI, PI)', () => {
+  near(foldedDifference(0.3, 0.1), 0.2);
+  near(foldedDifference(0.1, 0.3), -0.2);
+  // Across the wrap of the heading at the finish line: from 2 PI - 0.1 to 0.1.
+  near(foldedDifference(0.1, 2 * Math.PI - 0.1), 0.2);
+  near(foldedDifference(2 * Math.PI - 0.1, 0.1), -0.2);
+  near(foldedDifference(0.1 + 6 * Math.PI, 0.1), 0);
+  // The half turn maps to -PI, the lower end of the range, on both sides.
+  near(foldedDifference(Math.PI, 0), -Math.PI);
+  near(foldedDifference(0, Math.PI), -Math.PI);
+  for (const a of [-7, -3.2, 0, 1, 3.1, 9]) {
+    for (const b of [-5, -1, 0, 2.5, 6.5]) {
+      const d = foldedDifference(a, b);
+      assert.ok(d >= -Math.PI && d < Math.PI, `${a}, ${b}: ${d}`);
+      near(Math.cos(d), Math.cos(a - b), 1e-12);
+      near(Math.sin(d), Math.sin(a - b), 1e-12);
+    }
+  }
 });

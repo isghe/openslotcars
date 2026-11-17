@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { OVAL, buildCircuit } from '../src/core/circuits.js';
-import { terminalSpeed } from '../src/core/physics.js';
+import { terminalSpeed, withParams, DEFAULT_PARAMS } from '../src/core/physics.js';
 import {
+  DEFAULT_RULES,
   createContext,
   createWorld,
   stepWorld,
@@ -269,4 +270,196 @@ test('a lap time converges as the physics step gets smaller', () => {
   // 2.7 ms against the finest step); at 1/30 s it is more than ten.
   assert.ok(errors[2] < 0.005, `error at 1/120 s: ${errors[2]}`);
   assert.ok(errors[0] > 0.01, `error at 1/30 s: ${errors[0]}`);
+});
+
+// The tail rule: the pin follows the lane and the body may swing out.
+
+function tailContext(laneName, rules = {}) {
+  return contextFor(laneName, { tailSlide: true, ...rules });
+}
+
+/** The part of a world that the plain model also has, to compare. */
+function plainPart(world) {
+  const { status, distance, speed } = world.car;
+  return { stepIndex: world.stepIndex, time: world.time, timer: world.timer, car: { status, distance, speed } };
+}
+
+test('the tail rule is off by default and then the car keeps its plain state', () => {
+  assert.equal(DEFAULT_RULES.tailSlide, false);
+  const context = contextFor('inner');
+  assert.equal(context.tailSlide, false);
+  const history = run(context, 5, () => 1);
+  assert.ok(history.some((world) => world.car.status === 'offTrack'));
+  for (const world of history) {
+    const expected = world.car.status === 'onTrack'
+      ? ['distance', 'speed', 'status']
+      : ['distance', 'resumeStep', 'speed', 'status', 'travel'];
+    assert.deepEqual(Object.keys(world.car).sort(), expected);
+  }
+});
+
+test('the tail rule is validated, and a step too coarse for the tail is rejected', () => {
+  assert.equal(tailContext('inner').tailSlide, true);
+  assert.throws(() => contextFor('inner', { tailSlide: 1 }), RangeError);
+  assert.throws(() => contextFor('inner', { tailSlide: 'yes' }), RangeError);
+  // The car at its free speed must not cover the pin-to-axle distance in a step.
+  const coarse = DEFAULT_PARAMS.pinToRearAxle / DEFAULT_PARAMS.freeSpeed;
+  assert.throws(() => tailContext('inner', { dt: 1.01 * coarse }), RangeError);
+  assert.doesNotThrow(() => tailContext('inner', { dt: 0.99 * coarse }));
+  // The plain model has no such limit.
+  assert.doesNotThrow(() => contextFor('inner', { dt: 1.01 * coarse }));
+  const short = withParams({ pinToRearAxle: 0.01 });
+  assert.throws(
+    () => createContext({ lane: circuit.lanes.inner, params: short, rules: { tailSlide: true } }),
+    RangeError,
+  );
+});
+
+test('with the tail rule the car starts aligned, with no slide', () => {
+  const world = createWorld(tailContext('inner'));
+  assert.deepEqual(world.car, {
+    status: 'onTrack', distance: -0.1, speed: 0, slip: 0, yawRate: 0, rearSlip: 0,
+  });
+});
+
+test('where the tail never slides the motion is exactly the plain one', () => {
+  for (const laneName of ['inner', 'outer']) {
+    for (const throttle of [0.3, 0.45]) {
+      const plain = run(contextFor(laneName), 60, () => throttle);
+      const tail = run(tailContext(laneName), 60, () => throttle);
+      for (let i = 0; i < plain.length; i += 1) {
+        assert.deepStrictEqual(plainPart(tail[i]), plainPart(plain[i]), `${laneName} ${throttle} step ${i}`);
+        assert.ok(tail[i].car.rearSlip === 0, `${laneName} ${throttle} step ${i}`);
+      }
+      assert.ok(tail.at(-1).timer.laps.length >= 8);
+    }
+  }
+});
+
+test('the tail rolls inside the curves and comes back in line on the straights', () => {
+  const context = tailContext('inner');
+  const history = run(context, 60, () => 0.3);
+  const lane = context.lane;
+  let inCurve = 0;
+  let onStraight = 0;
+  let largestStep = 0;
+  for (let i = 1; i < history.length; i += 1) {
+    const { car } = history[i];
+    largestStep = Math.max(largestStep, Math.abs(car.slip - history[i - 1].car.slip));
+    // Settled in a curve: the tail is inside, at -asin(l * curvature).
+    if (lane.curvatureAt(car.distance) !== 0 && lane.curvatureAt(car.distance - 0.5) !== 0) {
+      const expected = -Math.asin(DEFAULT_PARAMS.pinToRearAxle * lane.curvatureAt(car.distance));
+      assert.ok(Math.abs(car.slip - expected) < 0.01, `step ${i}: slip ${car.slip}, expected ${expected}`);
+      inCurve += 1;
+    }
+    // Settled on a straight: aligned.
+    if (lane.curvatureAt(car.distance) === 0 && lane.curvatureAt(car.distance - 0.4) === 0) {
+      assert.ok(Math.abs(car.slip) < 0.01, `step ${i}: slip ${car.slip}`);
+      onStraight += 1;
+    }
+  }
+  assert.ok(inCurve > 500 && onStraight > 500, `${inCurve} steps in curves, ${onStraight} on straights`);
+  // The angle never jumps, not at the finish line either, where the heading of
+  // the lane wraps around from 2 PI to 0.
+  assert.ok(largestStep < 0.05, `largest step ${largestStep}`);
+});
+
+test('full throttle spins the car out of the first curve, later than the plain model', () => {
+  const plain = run(contextFor('inner'), 3, () => 1).find((world) => world.car.status === 'offTrack');
+  const context = tailContext('inner');
+  const history = run(context, 3, () => 1);
+  const exitIndex = history.findIndex((world) => world.car.status === 'offTrack');
+  const exit = history[exitIndex];
+  assert.ok(exit, 'the car never left the track');
+  // The first curve of the inner lane starts after 1 m and is 0.35 PI long.
+  assert.ok(exit.car.distance > plain.car.distance, `exit at ${exit.car.distance} m`);
+  assert.ok(exit.car.distance < 1 + Math.PI * 0.35, `exit at ${exit.car.distance} m`);
+  assert.ok(exit.car.slip > DEFAULT_PARAMS.maxSlipAngle, `slip ${exit.car.slip}`);
+  assert.equal(exit.car.travel, 0);
+  assert.equal(exit.timer.currentLapHadExit, true);
+  // Before that the tail was sliding and the car was on the track.
+  const before = history.slice(0, exitIndex);
+  assert.ok(before.some((world) => world.car.rearSlip !== 0));
+  assert.ok(before.every((world) => world.car.status === 'onTrack'));
+  // While it slides off the track, the angle of the spin is kept.
+  const slide = history.slice(exitIndex, exitIndex + context.recoverySteps);
+  assert.ok(slide.every((world) => world.car.slip === exit.car.slip));
+});
+
+test('a throttle that the plain model cannot hold is held by a sliding tail', () => {
+  const plain = run(contextFor('inner'), 60, () => 0.6);
+  assert.ok(plain.some((world) => world.car.status === 'offTrack'));
+
+  const history = run(tailContext('inner'), 60, () => 0.6);
+  assert.ok(history.every((world) => world.car.status === 'onTrack'));
+  assert.ok(history.some((world) => world.car.rearSlip !== 0), 'the tail never slid');
+  const { timer } = history.at(-1);
+  assert.ok(timer.laps.length >= 10, `laps: ${timer.laps.length}`);
+  assert.ok(timer.laps.every((lap) => lap.valid));
+  // The slide stays below the spin-out angle with some margin.
+  const widest = Math.max(...history.map((world) => Math.abs(world.car.slip)));
+  assert.ok(widest > 0.2 && widest < DEFAULT_PARAMS.maxSlipAngle, `widest slip ${widest}`);
+});
+
+test('after the recovery time the car is back at rest and aligned', () => {
+  const context = tailContext('inner');
+  const history = run(context, 3, () => 1);
+  const exitIndex = history.findIndex((world) => world.car.status === 'offTrack');
+  const exit = history[exitIndex];
+  const before = history[exitIndex + context.recoverySteps - 1];
+  const after = history[exitIndex + context.recoverySteps];
+  assert.equal(before.car.status, 'offTrack');
+  assert.deepEqual(after.car, {
+    status: 'onTrack', distance: exit.car.distance, speed: 0, slip: 0, yawRate: 0, rearSlip: 0,
+  });
+  assert.equal(after.timer, exit.timer);
+  // The car can start again and holds a moderate throttle as before.
+  const again = run(context, 20, () => 0.3, after);
+  assert.ok(again.every((world) => world.car.status === 'onTrack'));
+  assert.ok(again.every((world) => Math.abs(world.car.slip) < 0.3));
+});
+
+test('the tail rule is deterministic and does not modify the world it receives', () => {
+  const context = tailContext('inner');
+  const pattern = [1, 1, 0.6, 0, 0.3, 0.3, 1, 0];
+  const play = () => run(context, 30, (world, i) => pattern[Math.floor(i / 50) % pattern.length]);
+  assert.deepStrictEqual(play(), play());
+
+  let world = deepFreeze(createWorld(context));
+  for (let i = 0; i < 1200; i += 1) {
+    world = deepFreeze(stepWorld(world, { throttle: i < 300 ? 1 : 0.6 }, context));
+  }
+  assert.equal(world.stepIndex, 1200);
+});
+
+test('a lap with a sliding tail depends little on the physics step', () => {
+  // Steps above 1/120 s are too coarse for the tail and are rejected.
+  const lane = circuit.lanes.inner;
+  function firstLap(dt) {
+    const stepContext = createContext({ lane, rules: { dt, tailSlide: true } });
+    let world = createWorld(stepContext);
+    let sliding = 0;
+    for (let i = 0; i < 400000 && world.timer.laps.length === 0; i += 1) {
+      world = stepWorld(world, { throttle: 0.6 }, stepContext);
+      if (world.car.rearSlip !== 0) sliding += 1;
+    }
+    assert.ok(world.timer.laps[0].valid);
+    return { time: world.timer.laps[0].time, slidingTime: sliding * dt };
+  }
+  const steps = [120, 240, 480, 960];
+  const reference = firstLap(1 / 1920);
+  const laps = steps.map((n) => firstLap(1 / n));
+
+  // The switch between holding and sliding makes the lap time wander by about
+  // a millisecond, so it does not shrink in a regular order as the step does
+  // (measured: 3.0827, 3.0816, 3.0815, 3.0826, 3.0831 s from 1/120 to 1/1920 s).
+  // What is claimed is only that every step lands within 3 ms of the finest.
+  for (const [i, lap] of laps.entries()) {
+    assert.ok(Math.abs(lap.time - reference.time) < 0.003, `1/${steps[i]} s: ${lap.time} against ${reference.time}`);
+  }
+  // The time spent sliding does converge: it falls as the step shrinks.
+  const slidingTimes = [...laps, reference].map((lap) => lap.slidingTime);
+  for (let i = 1; i < slidingTimes.length; i += 1) {
+    assert.ok(slidingTimes[i] < slidingTimes[i - 1], `sliding times ${slidingTimes.join(', ')}`);
+  }
 });
