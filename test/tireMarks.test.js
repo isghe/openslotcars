@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { OVAL, buildCircuit } from '../src/core/circuits.js';
-import { DEFAULT_PARAMS } from '../src/core/physics.js';
+import { DEFAULT_PARAMS, scrubDeceleration } from '../src/core/physics.js';
 import { createContext, createWorld, stepWorld } from '../src/core/simulation.js';
 import { createTireMarks } from '../src/ui/tireMarks.js';
 
@@ -44,6 +44,19 @@ function wheelsOf(world) {
 
 const sliding = (world) => world.car.status === 'onTrack' && world.car.rearSlip !== 0;
 
+/**
+ * How hard the tail slides: the share of the rear grip that works against the
+ * car, worked out with the physics module and not with the formula of the marks.
+ */
+const REAR_GRIP = (DEFAULT_PARAMS.maxLateralAcceleration * DEFAULT_PARAMS.pinToCenterOfMass) / REAR;
+const intensityOf = (world) => scrubDeceleration(world.car.speed, world.car.rearSlip) / REAR_GRIP;
+const FULL = 0.4;
+
+/** Strength of the mark between two consecutive sliding worlds. */
+function strengthBetween(before, after, full = FULL) {
+  return Math.min(1, (intensityOf(before) + intensityOf(after)) / 2 / full);
+}
+
 test('no marks are left while the tail holds', () => {
   const marks = createTireMarks();
   for (const world of play(context, 30, 0.3)) {
@@ -74,6 +87,10 @@ test('a sliding tail leaves one mark per wheel, between two consecutive steps', 
       }
       // The wheels are one track width apart.
       near(Math.hypot(left.x2 - right.x2, left.y2 - right.y2), 2 * HALF_TRACK, 1e-12, `step ${i}`);
+      // Both marks are as strong as the slide between the two steps.
+      const strength = strengthBetween(history[i - 1], world);
+      near(left.strength, strength, 1e-12, `step ${i}`);
+      near(right.strength, strength, 1e-12, `step ${i}`);
       continued += 1;
     } else {
       // The first step of a slide has nothing to join, and no slide no mark.
@@ -81,6 +98,69 @@ test('a sliding tail leaves one mark per wheel, between two consecutive steps', 
     }
   }
   assert.ok(continued > 300, `${continued} steps with a mark`);
+});
+
+test('a mark is as strong as the slide, up to the full intensity', () => {
+  // At full throttle the slide grows from nothing until the car spins out, so
+  // it goes through the whole range of intensities.
+  const marks = createTireMarks();
+  const history = play(context, 4, 1);
+  const seen = [];
+  for (let i = 0; i < history.length; i += 1) {
+    marks.record(history[i], context);
+    if (!(i > 0 && sliding(history[i]) && sliding(history[i - 1]))) continue;
+    const [segment] = marks.segments(history[i].time).filter((s) => s.alpha === 1);
+    const mean = (intensityOf(history[i - 1]) + intensityOf(history[i])) / 2;
+    assert.ok(segment.strength > 0 && segment.strength <= 1, `strength ${segment.strength}`);
+    if (mean < FULL) near(segment.strength, mean / FULL, 1e-12, `step ${i}: proportional`);
+    else assert.equal(segment.strength, 1, `step ${i}: saturated`);
+    seen.push({ mean, strength: segment.strength });
+  }
+  // The run really goes from faint to saturated marks.
+  assert.ok(seen.some((s) => s.strength < 0.2), 'no faint mark');
+  assert.ok(seen.some((s) => s.strength > 0.2 && s.strength < 1), 'no mark in between');
+  assert.ok(seen.some((s) => s.strength === 1), 'no saturated mark');
+  // A harder slide never gives a fainter mark.
+  seen.sort((a, b) => a.mean - b.mean);
+  for (let i = 1; i < seen.length; i += 1) assert.ok(seen[i].strength >= seen[i - 1].strength);
+});
+
+test('a slide faster than the car counts as the whole rear grip, and not more', () => {
+  const history = play(context, 20, 0.6);
+  const index = history.findIndex((world, i) => i > 0 && sliding(world) && sliding(history[i - 1]));
+  const base = history[index - 1];
+  // The rear axle moves sideways three times faster than the car goes ahead, then gently.
+  const fast = { ...base, car: { ...base.car, speed: 1, rearSlip: 3 } };
+  const gentle = { ...history[index], car: { ...history[index].car, speed: 1, rearSlip: 0.1 } };
+  assert.equal(intensityOf(fast), 1);
+  near(intensityOf(gentle), 0.1, 1e-12);
+
+  // With a full intensity above 1 a mark below the cap shows whether the
+  // intensity was capped: (1 + 0.1) / 2 / 2, and not (3 + 0.1) / 2 / 2.
+  const marks = createTireMarks({ fullIntensity: 2 });
+  marks.record(fast, context);
+  marks.record(gentle, context);
+  const [segment] = marks.segments(gentle.time);
+  near(segment.strength, (1 + 0.1) / 2 / 2, 1e-12);
+});
+
+test('the full intensity can be changed', () => {
+  const history = play(context, 4, 1);
+  const half = createTireMarks({ fullIntensity: 0.8 });
+  const normal = createTireMarks();
+  let compared = 0;
+  for (let i = 0; i < history.length; i += 1) {
+    half.record(history[i], context);
+    normal.record(history[i], context);
+    if (!(i > 0 && sliding(history[i]) && sliding(history[i - 1]))) continue;
+    const [a] = half.segments(history[i].time).filter((s) => s.alpha === 1);
+    const [b] = normal.segments(history[i].time).filter((s) => s.alpha === 1);
+    near(a.strength, strengthBetween(history[i - 1], history[i], 0.8), 1e-12, `step ${i}`);
+    // Where the normal mark is not saturated, half the full intensity is twice as faint.
+    if (b.strength < 1) near(a.strength, b.strength / 2, 1e-12, `step ${i}`);
+    compared += 1;
+  }
+  assert.ok(compared > 20);
 });
 
 test('the tail leaves its marks on the outside of the curve', () => {
@@ -215,7 +295,9 @@ test('the options are validated', () => {
   assert.throws(() => createTireMarks({ lifetime: Number.NaN }), RangeError);
   assert.throws(() => createTireMarks({ halfTrack: 0 }), RangeError);
   assert.throws(() => createTireMarks({ halfTrack: Number.POSITIVE_INFINITY }), RangeError);
-  assert.doesNotThrow(() => createTireMarks({ lifetime: 1, halfTrack: 0.01 }));
+  assert.throws(() => createTireMarks({ fullIntensity: 0 }), RangeError);
+  assert.throws(() => createTireMarks({ fullIntensity: Number.NaN }), RangeError);
+  assert.doesNotThrow(() => createTireMarks({ lifetime: 1, halfTrack: 0.01, fullIntensity: 0.5 }));
 });
 
 test('recording does not modify the world', () => {

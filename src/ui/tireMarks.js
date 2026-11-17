@@ -9,6 +9,14 @@
  * stays small. The marks are made of the worlds that are drawn, not of every
  * simulation step, so their shape depends a little on the frame rate.
  *
+ * Each segment also has a strength, which follows how hard the tail slides at
+ * that moment. The intensity of a slide is the share of the rear grip that
+ * works against the car, `min(1, |rearSlip| / speed)`, the same ratio that
+ * `scrubDeceleration` uses, so it is how much speed the slide takes from the
+ * car relative to the most it can take. The strength is that intensity divided
+ * by `fullIntensity`, up to 1: proportional below it, and as strong as it gets
+ * above it.
+ *
  * Time is the time of the world, in seconds, so a pause (the same world drawn
  * again) freezes the marks and a restart (the time goes back) clears them.
  *
@@ -30,14 +38,24 @@ function checkPositive(name, value) {
   }
 }
 
+/** How hard the tail slides, from 0 (not at all) to 1 (the whole rear grip). */
+function slideIntensity(car) {
+  return Math.min(1, Math.abs(car.rearSlip) / car.speed);
+}
+
 /**
- * @param {{lifetime?: number, halfTrack?: number}} [options] `lifetime` is how
- *   long a mark lasts, in seconds; `halfTrack` is the distance of each rear
- *   wheel from the axis of the car, in meters.
+ * @param {{lifetime?: number, halfTrack?: number, fullIntensity?: number}}
+ *   [options] `lifetime` is how long a mark lasts, in seconds; `halfTrack` is
+ *   the distance of each rear wheel from the axis of the car, in meters;
+ *   `fullIntensity` is the intensity of a slide from which a mark is as strong
+ *   as it gets. The default, 0.4, is about the hardest slide of a fast lap
+ *   (measured on the oval: lap of 2.28 s, intensities up to 0.41, and 95% of
+ *   the sliding steps below 0.3); harder slides, up to the spin-out, saturate.
  */
-export function createTireMarks({ lifetime = 2, halfTrack = 0.022 } = {}) {
+export function createTireMarks({ lifetime = 2, halfTrack = 0.022, fullIntensity = 0.4 } = {}) {
   checkPositive('lifetime', lifetime);
   checkPositive('halfTrack', halfTrack);
+  checkPositive('fullIntensity', fullIntensity);
 
   let marks = [];
   let lastTime = -Infinity;
@@ -55,6 +73,7 @@ export function createTireMarks({ lifetime = 2, halfTrack = 0.022 } = {}) {
     const side = { x: -Math.sin(pose.heading), y: Math.cos(pose.heading) };
     return {
       time: world.time,
+      intensity: slideIntensity(world.car),
       left: { x: axle.x + halfTrack * side.x, y: axle.y + halfTrack * side.y },
       right: { x: axle.x - halfTrack * side.x, y: axle.y - halfTrack * side.y },
     };
@@ -92,6 +111,8 @@ export function createTireMarks({ lifetime = 2, halfTrack = 0.022 } = {}) {
       }
       const current = wheelsOf(world, context);
       if (previous !== null && time - previous.time <= MAX_GAP) {
+        // The mark is as strong as the slide was between the two worlds.
+        const strength = Math.min(1, (previous.intensity + current.intensity) / 2 / fullIntensity);
         for (const wheel of ['left', 'right']) {
           marks.push({
             x1: previous[wheel].x,
@@ -99,6 +120,7 @@ export function createTireMarks({ lifetime = 2, halfTrack = 0.022 } = {}) {
             x2: current[wheel].x,
             y2: current[wheel].y,
             time,
+            strength,
           });
         }
       }
@@ -108,9 +130,11 @@ export function createTireMarks({ lifetime = 2, halfTrack = 0.022 } = {}) {
     /**
      * The marks to draw at a given time, oldest first.
      * @param {number} time Time in seconds, normally that of the drawn world.
-     * @returns {Array<{x1: number, y1: number, x2: number, y2: number, alpha: number}>}
+     * @returns {Array<{x1: number, y1: number, x2: number, y2: number, alpha: number, strength: number}>}
      *   `alpha` is 1 for a mark just made and falls to 0 at the end of its
-     *   lifetime; marks that are older than that are not returned.
+     *   lifetime; marks that are older than that are not returned. `strength`,
+     *   above 0 and up to 1, follows how hard the tail slid; it does not change
+     *   with time, so the mark to paint is as opaque as `alpha * strength`.
      */
     segments(time) {
       const visible = [];
@@ -123,6 +147,7 @@ export function createTireMarks({ lifetime = 2, halfTrack = 0.022 } = {}) {
           x2: mark.x2,
           y2: mark.y2,
           alpha: Math.min(1, 1 - age / lifetime),
+          strength: mark.strength,
         });
       }
       return visible;

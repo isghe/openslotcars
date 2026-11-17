@@ -43,9 +43,11 @@ const CAR_WIDTH = 0.06;
 const PIN_RADIUS = 0.009;
 const PIN_OUTLINE = 0.0015;
 const PIN_CORE_RATIO = 0.55;
-// The marks of the sliding rear tires. A fresh mark is drawn at this opacity
-// and fades out (see `tireMarks.js`); fresh, it has a contrast of 4.66:1 on the
-// surface (WCAG ratio of the blended color).
+// The marks of the sliding rear tires. The strongest fresh mark, from a hard
+// slide, is drawn at this opacity; a milder slide gives a fainter mark, in
+// proportion, and every mark fades out with time (see `tireMarks.js`). The
+// strongest has a contrast of 4.66:1 on the surface (WCAG ratio of the blended
+// color); the fainter ones are decorative and have less.
 const TIRE_MARK_WIDTH = 0.008;
 const TIRE_MARK_OPACITY = 0.7;
 const CHECKER_DEPTH = 0.016;
@@ -148,7 +150,7 @@ export function createRenderer(canvas, circuit, context) {
     // Square ends, so that two joined segments do not overlap and show a bead.
     surface.lineCap = 'butt';
     for (const segment of segments) {
-      surface.globalAlpha = TIRE_MARK_OPACITY * segment.alpha;
+      surface.globalAlpha = TIRE_MARK_OPACITY * segment.alpha * segment.strength;
       const [x1, y1] = toCanvas(segment.x1, segment.y1);
       const [x2, y2] = toCanvas(segment.x2, segment.y2);
       surface.beginPath();
