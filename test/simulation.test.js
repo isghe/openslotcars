@@ -1,9 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { OVAL, buildCircuit } from '../src/core/circuits.js';
+import { straight, curve } from '../src/core/geometry.js';
 import { terminalSpeed, withParams, DEFAULT_PARAMS } from '../src/core/physics.js';
 import {
   DEFAULT_RULES,
+  SLIDE_SPIN,
   createContext,
   createWorld,
   stepWorld,
@@ -462,4 +464,166 @@ test('a lap with a sliding tail depends little on the physics step', () => {
   for (let i = 1; i < slidingTimes.length; i += 1) {
     assert.ok(slidingTimes[i] < slidingTimes[i - 1], `sliding times ${slidingTimes.join(', ')}`);
   }
+});
+
+// The pose of the body, and the drawn world between two steps, with the tail rule.
+
+const BACK = DEFAULT_PARAMS.pinToCenterOfMass;
+
+/** The same oval driven clockwise: the curves turn to the right. */
+const clockwise = buildCircuit({
+  ...OVAL,
+  id: 'oval-clockwise',
+  pieces: [straight(1), curve(0.4, -Math.PI), straight(2), curve(0.4, -Math.PI), straight(1)],
+  lanes: { inner: -0.05, outer: 0.05 },
+});
+
+function clockwiseContext(laneName) {
+  return createContext({ lane: clockwise.lanes[laneName], rules: { tailSlide: true } });
+}
+
+/** Where the guide pin is: in front of the center of the body, by `BACK`. */
+function pinOf(pose) {
+  return { x: pose.x + BACK * Math.cos(pose.heading), y: pose.y + BACK * Math.sin(pose.heading) };
+}
+
+function gap(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+test('the mirrored oval has the same inner lane', () => {
+  assert.equal(clockwise.lanes.inner.length, circuit.lanes.inner.length);
+  assert.equal(clockwise.lanes.inner.curvatureAt(1.5), -circuit.lanes.inner.curvatureAt(1.5));
+});
+
+test('with the tail rule the pin is on the lane and the body trails behind it', () => {
+  const context = tailContext('inner');
+  const history = run(context, 20, () => 0.6);
+  let widest = 0;
+  for (const [i, world] of history.entries()) {
+    const lanePose = context.lane.poseAt(world.car.distance);
+    const pose = carPose(world, context);
+    assert.ok(gap(pinOf(pose), lanePose) < 1e-12, `step ${i}`);
+    assert.ok(Math.abs(gap(pose, lanePose) - BACK) < 1e-12, `step ${i}`);
+    assert.ok(Math.abs(pose.heading - (lanePose.heading + world.car.slip)) < 1e-12, `step ${i}`);
+    widest = Math.max(widest, Math.abs(world.car.slip));
+  }
+  // The body does turn: the heading is not that of the lane.
+  assert.ok(widest > 0.2);
+});
+
+test('with the tail rule off the pose is still the point on the lane', () => {
+  const context = contextFor('inner');
+  const history = run(context, 5, () => 0.6);
+  for (const world of history) {
+    if (world.car.status === 'onTrack') {
+      assert.deepEqual(carPose(world, context), context.lane.poseAt(world.car.distance));
+    }
+  }
+});
+
+test('on a straight the tail is in line, behind the pin', () => {
+  const context = tailContext('inner');
+  const world = createWorld(context);
+  const pose = carPose(world, context);
+  const lanePose = context.lane.poseAt(world.car.distance);
+  assert.ok(Math.abs(pose.heading - lanePose.heading) < 1e-15);
+  assert.ok(Math.abs(pose.x - (lanePose.x - BACK * Math.cos(lanePose.heading))) < 1e-12);
+  assert.ok(Math.abs(pose.y - (lanePose.y - BACK * Math.sin(lanePose.heading))) < 1e-12);
+});
+
+test('a car that spins out slides along the tangent, from where its body was', () => {
+  const context = tailContext('inner');
+  const history = run(context, 3, () => 1);
+  const exitIndex = history.findIndex((world) => world.car.status === 'offTrack');
+  const exit = history[exitIndex];
+  const lanePose = context.lane.poseAt(exit.car.distance);
+
+  // At the exit the body is exactly where it was on the track at that angle.
+  const onTrackPose = carPose({ ...exit, car: { ...exit.car, status: 'onTrack' } }, context);
+  assert.deepEqual(carPose(exit, context), onTrackPose);
+
+  // No jump when the car leaves the track. The center of the body cannot move
+  // more than the pin does (at most speed * dt) plus what the turn of the body
+  // moves it about the pin; off the track it moves by the distance slid.
+  const before = carPose(history[exitIndex - 1], context);
+  const first = carPose(exit, context);
+  const turned = Math.abs(first.heading - before.heading);
+  assert.ok(gap(first, before) <= exit.car.speed * context.dt + BACK * turned + 1e-12);
+  for (let i = exitIndex + 1; i < exitIndex + 20; i += 1) {
+    const jump = gap(carPose(history[i], context), carPose(history[i - 1], context));
+    assert.ok(jump <= history[i - 1].car.speed * context.dt + 1e-12, `step ${i}: jump ${jump} m`);
+  }
+
+  // At the exit the body is at the angle where it spun out, and it slides
+  // along the tangent of the lane at the exit point.
+  const start = carPose(exit, context);
+  assert.ok(Math.abs(start.heading - (lanePose.heading + exit.car.slip)) < 1e-12);
+  const later = history[exitIndex + 30];
+  const slid = carPose(later, context);
+  const travel = later.car.travel;
+  assert.ok(travel > 0);
+  assert.ok(Math.abs((slid.x - start.x) - travel * Math.cos(lanePose.heading)) < 1e-9);
+  assert.ok(Math.abs((slid.y - start.y) - travel * Math.sin(lanePose.heading)) < 1e-9);
+  // It keeps turning the way it was turning: counterclockwise, the tail out
+  // of a curve to the left.
+  assert.ok(exit.car.slip > 0);
+  assert.ok(Math.abs(slid.heading - (start.heading + SLIDE_SPIN * travel)) < 1e-9);
+});
+
+test('a car that spins out of a curve to the right keeps turning to the right', () => {
+  const context = clockwiseContext('inner');
+  const history = run(context, 3, () => 1);
+  const exitIndex = history.findIndex((world) => world.car.status === 'offTrack');
+  const exit = history[exitIndex];
+  assert.ok(exit, 'the car never left the track');
+  assert.ok(exit.car.slip < -DEFAULT_PARAMS.maxSlipAngle, `slip ${exit.car.slip}`);
+
+  const mirrored = run(tailContext('inner'), 3, () => 1);
+  const mirroredExit = mirrored.find((world) => world.car.status === 'offTrack');
+  assert.ok(Math.abs(exit.car.slip + mirroredExit.car.slip) < 1e-9);
+  assert.ok(Math.abs(exit.car.distance - mirroredExit.car.distance) < 1e-9);
+
+  const start = carPose(exit, context);
+  const later = history[exitIndex + 30];
+  const slid = carPose(later, context);
+  assert.ok(Math.abs(slid.heading - (start.heading - SLIDE_SPIN * later.car.travel)) < 1e-9);
+});
+
+test('the slip is interpolated between two steps with the tail rule', () => {
+  const context = tailContext('inner');
+  const history = run(context, 2, () => 0.6);
+  const previous = history[history.length - 2];
+  const current = history[history.length - 1];
+  assert.notEqual(previous.car.slip, current.car.slip);
+
+  assert.equal(interpolateWorld(previous, current, 0).car.slip, previous.car.slip);
+  assert.equal(interpolateWorld(previous, current, 1).car.slip, current.car.slip);
+  const middle = interpolateWorld(previous, current, 0.5).car;
+  assert.ok(Math.abs(middle.slip - (previous.car.slip + current.car.slip) / 2) < 1e-15);
+  assert.ok(Math.abs(middle.distance - (previous.car.distance + current.car.distance) / 2) < 1e-12);
+  // The other fields are those of the current world.
+  assert.equal(middle.yawRate, current.car.yawRate);
+  assert.equal(middle.rearSlip, current.car.rearSlip);
+  // The drawn pose moves smoothly between the two steps.
+  const before = carPose(interpolateWorld(previous, current, 0), context);
+  const half = carPose(interpolateWorld(previous, current, 0.5), context);
+  const after = carPose(interpolateWorld(previous, current, 1), context);
+  assert.ok(Math.abs(gap(before, half) + gap(half, after) - gap(before, after)) < 1e-4);
+});
+
+test('without the tail rule the interpolated car has no slip', () => {
+  const context = contextFor('inner');
+  const history = run(context, 1, () => 0.3);
+  const middle = interpolateWorld(history[history.length - 2], history[history.length - 1], 0.5);
+  assert.equal('slip' in middle.car, false);
+});
+
+test('a car spinning off the track keeps its angle when it is interpolated', () => {
+  const context = tailContext('inner');
+  const history = run(context, 3, () => 1);
+  const exitIndex = history.findIndex((world) => world.car.status === 'offTrack');
+  const middle = interpolateWorld(history[exitIndex + 10], history[exitIndex + 11], 0.5);
+  assert.equal(middle.car.slip, history[exitIndex].car.slip);
+  assert.equal(middle.car.status, 'offTrack');
 });

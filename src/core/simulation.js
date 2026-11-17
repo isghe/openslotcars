@@ -213,16 +213,38 @@ export function stepWorld(world, input, context) {
  * Pose of the car in the plane, for drawing. On the track it is the pose on
  * the lane; off the track the car continues along the tangent at the exit
  * point and spins visually.
+ *
+ * With the rule `tailSlide` the pose is that of the center of the body, and its
+ * heading is the heading of the body, which is the one of the lane plus `slip`.
+ * The guide pin is on the lane, in front of the center by `pinToCenterOfMass`
+ * along the heading. Off the track the center slides along the tangent of the
+ * lane at the exit point, from where the body was, and the body keeps turning
+ * the way it was turning, which is the sign of `slip`.
  * @returns {{x: number, y: number, heading: number}}
  */
 export function carPose(world, context) {
   const car = world.car;
   const pose = context.lane.poseAt(car.distance);
-  if (car.status === 'onTrack') return pose;
+  if (!context.tailSlide) {
+    if (car.status === 'onTrack') return pose;
+    return {
+      x: pose.x + car.travel * Math.cos(pose.heading),
+      y: pose.y + car.travel * Math.sin(pose.heading),
+      heading: pose.heading + SLIDE_SPIN * car.travel,
+    };
+  }
+
+  const heading = pose.heading + car.slip;
+  const back = context.params.pinToCenterOfMass;
+  const x = pose.x - back * Math.cos(heading);
+  const y = pose.y - back * Math.sin(heading);
+  if (car.status === 'onTrack') return { x, y, heading };
+  // Off the track `slip` is beyond the spin-out angle, so its sign is defined.
+  const turning = Math.sign(car.slip);
   return {
-    x: pose.x + car.travel * Math.cos(pose.heading),
-    y: pose.y + car.travel * Math.sin(pose.heading),
-    heading: pose.heading + SLIDE_SPIN * car.travel,
+    x: x + car.travel * Math.cos(pose.heading),
+    y: y + car.travel * Math.sin(pose.heading),
+    heading: heading + turning * SLIDE_SPIN * car.travel,
   };
 }
 
@@ -230,9 +252,10 @@ export function carPose(world, context) {
  * World to draw between two simulation steps, for a smooth animation.
  *
  * The distance (or the slide) is interpolated between the previous and the
- * current world. When the car changed status, or was put back on the track,
- * between the two worlds there is nothing to interpolate and the current world
- * is returned as it is.
+ * current world, and so is the angle of the body (`slip`) when the car has one.
+ * When the car changed status, or was put back on the track, between the two
+ * worlds there is nothing to interpolate and the current world is returned as
+ * it is.
  * @param {object} previous World before the last step.
  * @param {object} current World after the last step.
  * @param {number} alpha Position between `previous` (0) and `current` (1),
@@ -248,6 +271,10 @@ export function interpolateWorld(previous, current, alpha) {
 
   if (after.status === 'onTrack') {
     const distance = before.distance + (after.distance - before.distance) * alpha;
+    if ('slip' in before && 'slip' in after) {
+      const slip = before.slip + (after.slip - before.slip) * alpha;
+      return { ...current, car: { ...after, distance, slip } };
+    }
     return { ...current, car: { ...after, distance } };
   }
   if (before.distance !== after.distance) return current;
