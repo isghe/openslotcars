@@ -175,3 +175,32 @@ export function carPose(world, context) {
     heading: pose.heading + SLIDE_SPIN * car.travel,
   };
 }
+
+/**
+ * World to draw between two simulation steps, for a smooth animation.
+ *
+ * The distance (or the slide) is interpolated between the previous and the
+ * current world. When the car changed status, or was put back on the track,
+ * between the two worlds there is nothing to interpolate and the current world
+ * is returned as it is.
+ * @param {object} previous World before the last step.
+ * @param {object} current World after the last step.
+ * @param {number} alpha Position between `previous` (0) and `current` (1),
+ *   from 0 to 1. It is the fraction of a step left over by the stepper.
+ */
+export function interpolateWorld(previous, current, alpha) {
+  if (!Number.isFinite(alpha) || alpha < 0 || alpha > 1) {
+    throw new RangeError(`alpha must be between 0 and 1, got ${alpha}`);
+  }
+  const before = previous.car;
+  const after = current.car;
+  if (before.status !== after.status) return current;
+
+  if (after.status === 'onTrack') {
+    const distance = before.distance + (after.distance - before.distance) * alpha;
+    return { ...current, car: { ...after, distance } };
+  }
+  if (before.distance !== after.distance) return current;
+  const travel = before.travel + (after.travel - before.travel) * alpha;
+  return { ...current, car: { ...after, travel } };
+}

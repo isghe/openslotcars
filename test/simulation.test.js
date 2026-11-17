@@ -7,6 +7,7 @@ import {
   createWorld,
   stepWorld,
   carPose,
+  interpolateWorld,
 } from '../src/core/simulation.js';
 
 const circuit = buildCircuit(OVAL);
@@ -191,4 +192,55 @@ test('rules can be changed', () => {
   const context = contextFor('inner', { recoveryTime: 0.5, startDistance: -0.2 });
   assert.equal(context.recoverySteps, 60);
   assert.equal(createWorld(context).car.distance, -0.2);
+});
+
+test('the drawn world is interpolated between two steps', () => {
+  const context = contextFor('inner');
+  const history = run(context, 1, () => 0.3);
+  const previous = history[history.length - 2];
+  const current = history[history.length - 1];
+
+  assert.equal(interpolateWorld(previous, current, 0).car.distance, previous.car.distance);
+  assert.equal(interpolateWorld(previous, current, 1).car.distance, current.car.distance);
+  const middle = interpolateWorld(previous, current, 0.5).car.distance;
+  assert.ok(Math.abs(middle - (previous.car.distance + current.car.distance) / 2) < 1e-12);
+
+  // The other parts of the world are those of the current one.
+  assert.equal(interpolateWorld(previous, current, 0.5).timer, current.timer);
+  assert.equal(interpolateWorld(previous, current, 0.5).stepIndex, current.stepIndex);
+  // The inputs are not modified.
+  assert.equal(current.car.distance, history[history.length - 1].car.distance);
+});
+
+test('a sliding car is interpolated on its travel', () => {
+  const context = contextFor('inner');
+  const history = run(context, 3, () => 1);
+  const exitIndex = history.findIndex((world) => world.car.status === 'offTrack');
+  const previous = history[exitIndex + 10];
+  const current = history[exitIndex + 11];
+  const middle = interpolateWorld(previous, current, 0.5);
+  assert.equal(middle.car.status, 'offTrack');
+  assert.equal(middle.car.distance, current.car.distance);
+  assert.ok(Math.abs(middle.car.travel - (previous.car.travel + current.car.travel) / 2) < 1e-12);
+});
+
+test('nothing is interpolated when the car changes status', () => {
+  const context = contextFor('inner');
+  const history = run(context, 3, () => 1);
+  const exitIndex = history.findIndex((world) => world.car.status === 'offTrack');
+  // From the last step on the track to the first one off it.
+  assert.equal(interpolateWorld(history[exitIndex - 1], history[exitIndex], 0.5), history[exitIndex]);
+  // From the last step off the track to the first one back on it.
+  const back = exitIndex + context.recoverySteps;
+  assert.equal(history[back - 1].car.status, 'offTrack');
+  assert.equal(history[back].car.status, 'onTrack');
+  assert.equal(interpolateWorld(history[back - 1], history[back], 0.5), history[back]);
+});
+
+test('an out-of-range interpolation fraction is rejected', () => {
+  const context = contextFor('inner');
+  const world = createWorld(context);
+  assert.throws(() => interpolateWorld(world, world, -0.1), RangeError);
+  assert.throws(() => interpolateWorld(world, world, 1.1), RangeError);
+  assert.throws(() => interpolateWorld(world, world, Number.NaN), RangeError);
 });
