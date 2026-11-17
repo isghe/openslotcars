@@ -8,11 +8,13 @@
  * its shape, not only by its color.
  *
  * With the rule `tailSlide` the car is drawn as a body that may be turned away
- * from the lane, with the guide pin, which stays on the lane, marked on it.
+ * from the lane, with the guide pin, which stays on the lane, marked on it, and
+ * the rear tires leave fading marks on the track while the tail slides.
  */
 
 import { createLane } from '../core/geometry.js';
 import { carPose } from '../core/simulation.js';
+import { createTireMarks } from './tireMarks.js';
 
 const PALETTE = Object.freeze({
   background: '#0f1216',
@@ -26,6 +28,7 @@ const PALETTE = Object.freeze({
   carWindow: '#1b2430',
   pinCore: '#000000',
   pinRing: '#ffffff',
+  tireMark: '#d7dbe2',
 });
 
 // Sizes in meters. A 1:32 car is about 13 cm long.
@@ -40,6 +43,11 @@ const CAR_WIDTH = 0.06;
 const PIN_RADIUS = 0.009;
 const PIN_OUTLINE = 0.0015;
 const PIN_CORE_RATIO = 0.55;
+// The marks of the sliding rear tires. A fresh mark is drawn at this opacity
+// and fades out (see `tireMarks.js`); fresh, it has a contrast of 4.66:1 on the
+// surface (WCAG ratio of the blended color).
+const TIRE_MARK_WIDTH = 0.008;
+const TIRE_MARK_OPACITY = 0.7;
 const CHECKER_DEPTH = 0.016;
 const CHECKER_CELLS = 8;
 const SAMPLE_SPACING = 0.02;
@@ -60,6 +68,7 @@ export function createRenderer(canvas, circuit, context) {
   const centerPoints = centerLane.sample(SAMPLE_SPACING);
   const lanePoints = Object.values(circuit.lanes).map((lane) => lane.sample(SAMPLE_SPACING));
   const finish = centerLane.poseAt(0);
+  const tireMarks = createTireMarks();
 
   // Bounding box of the track surface, with a margin.
   const half = circuit.trackWidth / 2 + EDGE_WIDTH + MARGIN;
@@ -127,6 +136,27 @@ export function createRenderer(canvas, circuit, context) {
         }
       }
     });
+  }
+
+  /** Draws the marks that the sliding rear tires left, fading out with time. */
+  function drawTireMarks(time) {
+    const segments = tireMarks.segments(time);
+    if (segments.length === 0) return;
+    surface.save();
+    surface.strokeStyle = PALETTE.tireMark;
+    surface.lineWidth = TIRE_MARK_WIDTH * scale;
+    // Square ends, so that two joined segments do not overlap and show a bead.
+    surface.lineCap = 'butt';
+    for (const segment of segments) {
+      surface.globalAlpha = TIRE_MARK_OPACITY * segment.alpha;
+      const [x1, y1] = toCanvas(segment.x1, segment.y1);
+      const [x2, y2] = toCanvas(segment.x2, segment.y2);
+      surface.beginPath();
+      surface.moveTo(x1, y1);
+      surface.lineTo(x2, y2);
+      surface.stroke();
+    }
+    surface.restore();
   }
 
   function drawCar(world) {
@@ -208,6 +238,9 @@ export function createRenderer(canvas, circuit, context) {
     strokePath(centerPoints, PALETTE.surface, circuit.trackWidth);
     for (const points of lanePoints) strokePath(points, PALETTE.slot, SLOT_WIDTH);
     drawFinishLine();
+    // While the game is paused the same world is drawn again, so the marks stay.
+    tireMarks.record(world, context);
+    drawTireMarks(world.time);
     drawCar(world);
     if (paused) drawPauseOverlay();
   }

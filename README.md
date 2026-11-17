@@ -19,6 +19,7 @@ This is a first playable prototype.
 - A fixed oval circuit with an inner and an outer lane (the car runs on the inner one).
 - One car with a throttle, motor braking, friction and air drag.
 - A car with a guide pin that follows the lane and a body that pivots about it. Going too fast in a curve makes the tail slide out, which costs speed; going much too fast turns the body so far that the car leaves the track, slides a short way, and is put back on its lane after a pause. The values of the body (distances, inertia, damping, spin-out angle) are estimates for a 1:32 car, not measurements.
+- Marks that the rear tires leave on the track while the tail slides, fading out after about two seconds.
 - Lap timing with a finish line, the last lap, the best lap, and laps marked as not valid when the car left the track.
 - Keyboard and touch controls, pause and restart.
 - An accessible timing panel, with events announced in a polite live region.
@@ -58,7 +59,7 @@ The game pauses by itself when the window loses the focus or the page is hidden.
 npm test
 ```
 
-This runs the tests with the test runner built into Node (`node --test`). They cover the geometry, the physics (the body and its sliding tail included), the lap timer, the simulation, the logic of each frame (pause and restart included), the controls, the content of the timing panel, the static server and the handling of keyboard, pointer and focus events (run against simple stand-ins for the page, not a real browser). The drawing on the canvas, the wiring in `src/main.js` and the connection of the timing panel to the page have no automated tests and are checked by hand in a browser.
+This runs the tests with the test runner built into Node (`node --test`). They cover the geometry, the physics (the body and its sliding tail included), the lap timer, the simulation, the logic of each frame (pause and restart included), the controls, the content of the timing panel, the logic of the tire marks, the static server and the handling of keyboard, pointer and focus events (run against simple stand-ins for the page, not a real browser). The drawing on the canvas, the wiring in `src/main.js` and the connection of the timing panel to the page have no automated tests and are checked by hand in a browser.
 
 ## How it works
 
@@ -67,7 +68,7 @@ This runs the tests with the test runner built into Node (`node --test`). They c
 - **Simulation** (`src/core/simulation.js`, `src/core/stepper.js`): the world advances in fixed steps of 1/120 s, whatever the frame rate, so results are deterministic. The drawing is interpolated between two steps. The rule `tailSlide` turns the body model on, and it is on by default; with it off the car is a single point on the lane and leaves the track as soon as the grip limit is exceeded. The body model needs a step shorter than the pin-to-axle distance over the free speed of the car (about 1/62 s with the default parameters), and the simulation refuses a longer one.
 - **Lap timing** (`src/core/lapTimer.js`): the instant of each crossing of the finish line is interpolated inside the step, which removes the rounding of lap times to a whole step. Their accuracy still depends on the physics step, because the motion is integrated only to first order: for a lap at a constant throttle the error against a much finer step is about 2.7 ms at the default 1/120 s and more than 10 ms at 1/30 s (see `test/simulation.test.js`).
 - **Frame logic** (`src/core/game.js`): what happens in each animation frame, including the pause (no time passes, and the time spent in pause is not made up for) and the restart.
-- **Page** (`src/ui/`, `src/main.js`): the canvas drawing, the input handling and the timing panel.
+- **Page** (`src/ui/`, `src/main.js`): the canvas drawing, the input handling and the timing panel. The tire marks (`src/ui/tireMarks.js`) are only a visual aid: the module keeps the segments that the two rear wheels traced while sliding and fades them out, and the drawing only paints them.
 
 The logic in `src/core/` is pure: it does not touch the page, read a clock or use random numbers, so it also runs in Node.
 
