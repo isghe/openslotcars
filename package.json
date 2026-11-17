@@ -1,0 +1,14 @@
+{
+  "name": "openslotcars",
+  "version": "0.1.0",
+  "description": "Browser-based slot car racing simulator",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}
