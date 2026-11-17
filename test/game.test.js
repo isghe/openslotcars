@@ -185,6 +185,54 @@ test('the drawn world lies between the previous and the current step', () => {
   }
 });
 
+test('the frame reports every step it ran, oldest first, the last one being the world', () => {
+  const { controls, game, frames } = setup();
+  // The first frame runs no step.
+  assert.deepStrictEqual(frames(1).steps, []);
+  controls.keyDown('Space');
+  let seen = 0;
+  for (let i = 0; i < 30; i += 1) {
+    const { world, steps } = frames(1);
+    // Frames of 1/60 s are two steps of 1/120 s.
+    assert.equal(steps.length, 2, `frame ${i}`);
+    assert.equal(steps[0].stepIndex, seen + 1);
+    assert.equal(steps[1].stepIndex, seen + 2);
+    assert.equal(steps[1], world);
+    seen += 2;
+  }
+  assert.equal(game.world.stepIndex, seen);
+
+  // A long gap is capped at 0.25 s, so at most 30 steps, all of them reported.
+  const gap = setup();
+  gap.frames(1);
+  gap.advanceClock(10_000);
+  const capped = gap.frames(1);
+  assert.equal(capped.steps.length, 30);
+  assert.deepStrictEqual(capped.steps.map((w) => w.stepIndex), Array.from({ length: 30 }, (_, i) => i + 1));
+});
+
+test('a frame that runs no step, such as one in a pause, reports no step', () => {
+  const { controls, frames } = setup();
+  frames(1);
+  controls.keyDown('Space');
+  frames(10);
+  controls.keyDown('KeyP');
+  for (let i = 0; i < 5; i += 1) assert.deepStrictEqual(frames(1).steps, []);
+});
+
+test('on a restart the steps are those of the new race', () => {
+  const { controls, frames } = setup();
+  frames(1);
+  controls.keyDown('Space');
+  frames(90);
+  controls.keyDown('KeyR');
+  const result = frames(1);
+  assert.equal(result.restarted, true);
+  assert.ok(result.steps.length > 0);
+  assert.deepStrictEqual(result.steps.map((w) => w.stepIndex), result.steps.map((_, i) => i + 1));
+  assert.equal(result.steps[result.steps.length - 1], result.world);
+});
+
 test('an invalid frame time is rejected', () => {
   const { game } = setup();
   assert.throws(() => game.frame(Number.NaN), RangeError);

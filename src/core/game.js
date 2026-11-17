@@ -33,10 +33,12 @@ export function createGame({ context, controls }) {
      * Advances the game up to the frame time `now`.
      * @param {number} now Time of the frame in milliseconds, from any origin
      *   as long as it never goes back.
-     * @returns {{world: object, drawn: object, paused: boolean, restarted: boolean}}
+     * @returns {{world: object, drawn: object, steps: object[], paused: boolean, restarted: boolean}}
      *   `world` is the state of the simulation, `drawn` the world to draw
-     *   (interpolated between two steps), `paused` whether the game is paused
-     *   and `restarted` whether a new race started in this frame.
+     *   (interpolated between two steps), `steps` the world after each step run
+     *   in this frame, oldest first (empty when none ran, as in a pause; if any
+     *   ran, the last one is `world`), `paused` whether the game is paused and
+     *   `restarted` whether a new race started in this frame.
      */
     frame(now) {
       if (!Number.isFinite(now)) {
@@ -56,21 +58,24 @@ export function createGame({ context, controls }) {
         // No time passes while paused: the next frame starts from zero.
         lastFrameTime = null;
         stepper.reset();
-        return { world, drawn: world, paused: true, restarted };
+        return { world, drawn: world, steps: [], paused: true, restarted };
       }
 
       const elapsed = lastFrameTime === null ? 0 : (now - lastFrameTime) / 1000;
       lastFrameTime = now;
 
-      const { steps, alpha } = stepper.advance(elapsed);
-      for (let i = 0; i < steps; i += 1) {
+      const { steps: count, alpha } = stepper.advance(elapsed);
+      const steps = [];
+      for (let i = 0; i < count; i += 1) {
         controls.step(context.dt);
         previous = world;
         world = stepWorld(world, { throttle: controls.throttle }, context);
+        steps.push(world);
       }
       return {
         world,
         drawn: interpolateWorld(previous, world, alpha),
+        steps,
         paused: false,
         restarted,
       };

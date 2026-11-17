@@ -2,12 +2,13 @@
  * Marks that the rear tires leave on the track while the tail slides.
  *
  * It is only a visual aid and does not touch the simulation. The page reports
- * every world it draws to `record`, and the module keeps the short line
- * segments that the two rear wheels traced between two consecutive drawn
- * worlds while they were sliding sideways (`rearSlip` not zero). Each segment
+ * to `record` the world after every simulation step, and the module keeps the
+ * short line segments that the two rear wheels traced between two consecutive
+ * steps while they were sliding sideways (`rearSlip` not zero). Each segment
  * fades out linearly over the lifetime and is then forgotten, so the memory
- * stays small. The marks are made of the worlds that are drawn, not of every
- * simulation step, so their shape depends a little on the frame rate.
+ * stays small. The marks are made of the steps and not of the frames that are
+ * drawn, so they are the same whatever the frame rate: a slow frame brings
+ * several steps at once.
  *
  * Each segment also has a strength, which follows how hard the tail slides at
  * that moment. The intensity of a slide is the share of the rear grip that
@@ -17,8 +18,9 @@
  * by `fullIntensity`, up to 1: proportional below it, and as strong as it gets
  * above it.
  *
- * Time is the time of the world, in seconds, so a pause (the same world drawn
- * again) freezes the marks and a restart (the time goes back) clears them.
+ * Time is the time of the world, in seconds, so a pause (the same world again)
+ * freezes the marks. A restart clears them: `reset` says so, and a world whose
+ * time goes back does the same.
  *
  * This module is pure logic: no DOM, no clock, no randomness.
  */
@@ -26,9 +28,10 @@
 import { carPose } from '../core/simulation.js';
 
 /**
- * Longest time between two drawn worlds for their marks to be joined, in
- * seconds. After a longer gap, such as a hidden page, there is no mark between
- * them: it would be a long line across the track.
+ * Longest time between two recorded worlds for their marks to be joined, in
+ * seconds. The worlds of consecutive steps are far closer than this; after a
+ * longer gap there is no mark between them, because it would be a long line
+ * across the track.
  */
 const MAX_GAP = 0.1;
 
@@ -80,9 +83,16 @@ export function createTireMarks({ lifetime = 2, halfTrack = 0.022, fullIntensity
   }
 
   return {
+    /** Forgets every mark and the world before: the race started again. */
+    reset() {
+      marks = [];
+      previous = null;
+      lastTime = -Infinity;
+    },
+
     /**
-     * Takes note of a drawn world.
-     * @param {object} world World to draw (see `createWorld`).
+     * Takes note of the world after a simulation step.
+     * @param {object} world World after a step (see `createWorld`).
      * @param {object} context Simulation context; with the tail rule off the
      *   car has no sliding tail and nothing is recorded.
      */
@@ -94,7 +104,7 @@ export function createTireMarks({ lifetime = 2, halfTrack = 0.022, fullIntensity
         marks = [];
         previous = null;
       } else if (time === lastTime) {
-        // The same world again, for instance while the game is paused.
+        // The same world again, for instance when the world is drawn again.
         return;
       }
       lastTime = time;

@@ -229,10 +229,14 @@ export function createRenderer(canvas, circuit, context) {
   /**
    * Draws the circuit and the car of the given world.
    * @param {object} world World to draw.
-   * @param {{paused?: boolean}} [options] When `paused`, a message is drawn
-   *   over the circuit.
+   * @param {{paused?: boolean, steps?: object[], restarted?: boolean}} [options]
+   *   When `paused`, a message is drawn over the circuit. `steps` are the worlds
+   *   of the simulation steps run since the last drawing, oldest first: the tire
+   *   marks are made of them, so they do not depend on how often the world is
+   *   drawn. Without it the marks are made of `world` alone. When `restarted`,
+   *   the marks of the race before are forgotten.
    */
-  function draw(world, { paused = false } = {}) {
+  function draw(world, { paused = false, steps = [world], restarted = false } = {}) {
     surface.fillStyle = PALETTE.background;
     surface.fillRect(0, 0, width, height);
 
@@ -240,8 +244,9 @@ export function createRenderer(canvas, circuit, context) {
     strokePath(centerPoints, PALETTE.surface, circuit.trackWidth);
     for (const points of lanePoints) strokePath(points, PALETTE.slot, SLOT_WIDTH);
     drawFinishLine();
-    // While the game is paused the same world is drawn again, so the marks stay.
-    tireMarks.record(world, context);
+    // While the game is paused no step runs, so the marks stay.
+    if (restarted) tireMarks.reset();
+    for (const step of steps) tireMarks.record(step, context);
     drawTireMarks(world.time);
     drawCar(world);
     if (paused) drawPauseOverlay();

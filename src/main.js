@@ -47,11 +47,12 @@ function frame(now) {
   if (result.restarted) hud.restart(result.world);
   syncButtons();
 
+  const { steps, restarted } = result;
   if (result.paused) {
-    renderer.draw(result.drawn, { paused: true });
+    renderer.draw(result.drawn, { paused: true, steps, restarted });
   } else {
     hud.update(result.world);
-    renderer.draw(result.drawn);
+    renderer.draw(result.drawn, { steps, restarted });
   }
   requestAnimationFrame(frame);
 }

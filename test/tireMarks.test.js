@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { OVAL, buildCircuit } from '../src/core/circuits.js';
 import { DEFAULT_PARAMS, scrubDeceleration } from '../src/core/physics.js';
+import { createGame } from '../src/core/game.js';
 import { createContext, createWorld, stepWorld } from '../src/core/simulation.js';
 import { createTireMarks } from '../src/ui/tireMarks.js';
 
@@ -287,6 +288,63 @@ test('nothing is recorded off the track or with the tail rule off', () => {
   const plain = createTireMarks();
   for (const world of play(plainContext, 10, 1)) plain.record(world, plainContext);
   assert.equal(plain.size, 0);
+});
+
+test('a reset forgets the marks and the world before it, whatever the time', () => {
+  const marks = createTireMarks();
+  const history = play(context, 20, 0.6);
+  const index = history.findIndex((world, i) => i > 0 && sliding(world) && sliding(history[i - 1]));
+  for (let i = 0; i <= index; i += 1) marks.record(history[i], context);
+  assert.ok(marks.size > 0);
+  marks.reset();
+  assert.equal(marks.size, 0);
+  // The slide goes on after the reset at a later time: the first world after
+  // it has nothing to join, so there is no mark to the world before the reset.
+  marks.record(history[index + 1], context);
+  assert.equal(marks.size, 0);
+  marks.record(history[index + 2], context);
+  assert.equal(marks.size, 2);
+
+  // Even a new race whose first world has the very time of the last one before
+  // the reset (not an earlier time) is taken as a world of its own.
+  marks.reset();
+  marks.record(history[index + 2], context);
+  marks.record(history[index + 3], context);
+  assert.equal(marks.size, 2);
+});
+
+/**
+ * Plays the game with frames of the given rate, for `seconds` of real time,
+ * and feeds the marks the way the page does: with the steps of each frame.
+ */
+function playFrames(rate, seconds, throttle = 0.6) {
+  const game = createGame({
+    context,
+    controls: { paused: false, throttle, takeRestart: () => false, step() {} },
+  });
+  const marks = createTireMarks();
+  let slidingFrames = 0;
+  for (let i = 0; i <= Math.round(seconds * rate); i += 1) {
+    const { steps, drawn } = game.frame((i * 1000) / rate);
+    for (const world of steps) marks.record(world, context);
+    if (sliding(drawn)) slidingFrames += 1;
+  }
+  return { game, marks, slidingFrames };
+}
+
+test('the marks do not depend on the frame rate, down to a frame every 0.2 s', () => {
+  for (const rate of [240, 120, 60, 30, 12, 10, 9, 5]) {
+    const { game, marks, slidingFrames } = playFrames(rate, 8);
+    assert.ok(slidingFrames > 0, `${rate} Hz: the tail never slides`);
+    // The reference: the very same steps, fed one by one, with no frames.
+    const history = play(context, game.world.stepIndex * context.dt, 0.6);
+    assert.equal(history.length - 1, game.world.stepIndex, `${rate} Hz`);
+    const reference = createTireMarks();
+    for (const world of history) reference.record(world, context);
+    const now = game.world.time;
+    assert.ok(marks.segments(now).length > 100, `${rate} Hz: ${marks.segments(now).length} marks`);
+    assert.deepStrictEqual(marks.segments(now), reference.segments(now), `${rate} Hz`);
+  }
 });
 
 test('the options are validated', () => {
