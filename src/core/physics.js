@@ -15,6 +15,11 @@
  * and air drag (proportional to v^2). A car at rest stays at rest unless the
  * drive beats the rolling friction.
  *
+ * In a curve the car needs a lateral acceleration of v^2 * |curvature|. The
+ * magnet and the guide pin give it a fixed grip: above `maxLateralAcceleration`
+ * the car leaves the track, and from then on it slides straight along the
+ * tangent while the table slows it down.
+ *
  * This module is pure logic: no DOM, no clock, no randomness.
  */
 
@@ -27,6 +32,9 @@
  * - `brakeAcceleration`: motor braking deceleration at speed V0, m/s^2.
  * - `rollingFriction`: constant deceleration while moving, m/s^2.
  * - `airDrag`: coefficient of the v^2 deceleration, 1/m.
+ * - `maxLateralAcceleration`: grip limit in curves, m/s^2 (about 1.2 g with
+ *   the magnet).
+ * - `offTrackDeceleration`: deceleration of a car sliding on the table, m/s^2.
  */
 export const DEFAULT_PARAMS = Object.freeze({
   spinUpAcceleration: 8,
@@ -34,6 +42,8 @@ export const DEFAULT_PARAMS = Object.freeze({
   brakeAcceleration: 12,
   rollingFriction: 0.5,
   airDrag: 0.02,
+  maxLateralAcceleration: 12,
+  offTrackDeceleration: 5,
 });
 
 /**
@@ -113,4 +123,57 @@ export function stepLongitudinal(state, throttle, dt, params = DEFAULT_PARAMS) {
   const acceleration = netAcceleration(state.speed, throttle, params);
   const speed = Math.max(0, state.speed + acceleration * dt);
   return { distance: state.distance + speed * dt, speed };
+}
+
+function checkCurvature(curvature) {
+  if (!Number.isFinite(curvature)) {
+    throw new RangeError(`curvature must be a finite number, got ${curvature}`);
+  }
+  return Math.abs(curvature);
+}
+
+/**
+ * Lateral acceleration needed to follow a curve at the given speed.
+ * @param {number} speed Speed in m/s.
+ * @param {number} curvature Signed curvature in 1/m; only its size matters.
+ * @returns {number} Acceleration in m/s^2, never negative.
+ */
+export function lateralAcceleration(speed, curvature) {
+  return speed * speed * checkCurvature(curvature);
+}
+
+/**
+ * Highest speed at which a curve can be followed.
+ * @returns {number} Speed in m/s, or `Infinity` on a straight.
+ */
+export function criticalSpeed(curvature, params = DEFAULT_PARAMS) {
+  const size = checkCurvature(curvature);
+  if (size === 0) return Infinity;
+  return Math.sqrt(params.maxLateralAcceleration / size);
+}
+
+/**
+ * Tells whether the car loses grip: the needed lateral acceleration is
+ * strictly above the limit. The threshold is instantaneous, with no
+ * tolerance, so the outcome depends only on speed and curvature.
+ */
+export function hasLostGrip(speed, curvature, params = DEFAULT_PARAMS) {
+  return lateralAcceleration(speed, curvature) > params.maxLateralAcceleration;
+}
+
+/**
+ * Advances a car that left the track by one fixed time step. It keeps going
+ * straight along the tangent at the exit point and the table slows it down.
+ * @param {{travel: number, speed: number}} state `travel` is the distance
+ *   slid since the exit, in meters.
+ * @param {number} dt Time step in seconds.
+ * @param {typeof DEFAULT_PARAMS} [params]
+ * @returns {{travel: number, speed: number}} The new state.
+ */
+export function stepOffTrack(state, dt, params = DEFAULT_PARAMS) {
+  if (!Number.isFinite(dt) || dt <= 0) {
+    throw new RangeError(`dt must be a positive finite number, got ${dt}`);
+  }
+  const speed = Math.max(0, state.speed - params.offTrackDeceleration * dt);
+  return { travel: state.travel + speed * dt, speed };
 }

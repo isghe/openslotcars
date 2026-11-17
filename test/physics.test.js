@@ -6,6 +6,10 @@ import {
   netAcceleration,
   terminalSpeed,
   stepLongitudinal,
+  lateralAcceleration,
+  criticalSpeed,
+  hasLostGrip,
+  stepOffTrack,
 } from '../src/core/physics.js';
 
 const DT = 1 / 120;
@@ -130,4 +134,85 @@ test('parameters can be overridden and are validated', () => {
   assert.throws(() => withParams({ freeSpeed: 0 }), RangeError);
   assert.throws(() => withParams({ airDrag: Number.NaN }), RangeError);
   assert.ok(Object.isFrozen(DEFAULT_PARAMS));
+});
+
+// Lateral grip and leaving the track.
+
+const INNER_CURVATURE = 1 / 0.35;
+const OUTER_CURVATURE = 1 / 0.45;
+
+test('lateral acceleration grows with the square of the speed and the curvature', () => {
+  near(lateralAcceleration(2, 0.5), 2, 1e-12);
+  near(lateralAcceleration(4, 0.5), 8, 1e-12);
+  assert.equal(lateralAcceleration(3, -0.5), lateralAcceleration(3, 0.5));
+  assert.equal(lateralAcceleration(3, 0), 0);
+});
+
+test('the critical speed matches the oval lanes', () => {
+  near(criticalSpeed(INNER_CURVATURE), Math.sqrt(12 * 0.35), 1e-12);
+  near(criticalSpeed(INNER_CURVATURE), 2.049, 1e-3);
+  near(criticalSpeed(OUTER_CURVATURE), 2.324, 1e-3);
+  assert.equal(criticalSpeed(-INNER_CURVATURE), criticalSpeed(INNER_CURVATURE));
+  assert.equal(criticalSpeed(0), Infinity);
+});
+
+test('the car keeps its grip just below the critical speed and loses it just above', () => {
+  for (const curvature of [INNER_CURVATURE, OUTER_CURVATURE, -INNER_CURVATURE]) {
+    const limit = criticalSpeed(curvature);
+    assert.equal(hasLostGrip(limit * (1 - 1e-6), curvature), false);
+    assert.equal(hasLostGrip(limit * (1 + 1e-6), curvature), true);
+  }
+});
+
+test('the car never loses grip on a straight', () => {
+  for (const speed of [0, 1, 4.4, 100, 1e6]) {
+    assert.equal(hasLostGrip(speed, 0), false);
+  }
+});
+
+test('full throttle is too fast for the curves, while a moderate throttle holds', () => {
+  assert.ok(terminalSpeed(1) > criticalSpeed(INNER_CURVATURE));
+  assert.ok(terminalSpeed(1) > criticalSpeed(OUTER_CURVATURE));
+  assert.ok(terminalSpeed(0.3) < criticalSpeed(INNER_CURVATURE));
+  // Half throttle holds on the wide outer lane but not on the tight inner one.
+  assert.ok(terminalSpeed(0.5) > criticalSpeed(INNER_CURVATURE));
+  assert.ok(terminalSpeed(0.5) < criticalSpeed(OUTER_CURVATURE));
+});
+
+test('a car sliding off the track slows down at the table deceleration', () => {
+  let state = { travel: 0, speed: 4 };
+  let previous = state;
+  let steps = 0;
+  while (state.speed > 0) {
+    state = stepOffTrack(state, DT);
+    assert.ok(state.speed < previous.speed);
+    assert.ok(state.travel >= previous.travel);
+    previous = state;
+    steps += 1;
+    assert.ok(steps < 1000, 'the car never stopped');
+  }
+  // 4 m/s at 5 m/s^2 takes 0.8 s and covers v^2 / (2a) = 1.6 m.
+  near(steps * DT, 0.8, 2 * DT);
+  near(state.travel, 1.6, 0.02);
+  assert.equal(state.speed, 0);
+  assert.deepEqual(stepOffTrack(state, DT), state);
+});
+
+test('grip functions reject invalid arguments', () => {
+  assert.throws(() => lateralAcceleration(2, Number.NaN), RangeError);
+  assert.throws(() => criticalSpeed(Number.POSITIVE_INFINITY), RangeError);
+  assert.throws(() => hasLostGrip(2, Number.NaN), RangeError);
+  assert.throws(() => stepOffTrack({ travel: 0, speed: 1 }, 0), RangeError);
+});
+
+test('the grip parameters can be overridden', () => {
+  const grippy = withParams({ maxLateralAcceleration: 24 });
+  assert.ok(criticalSpeed(INNER_CURVATURE, grippy) > criticalSpeed(INNER_CURVATURE));
+  assert.equal(hasLostGrip(2.2, INNER_CURVATURE), true);
+  assert.equal(hasLostGrip(2.2, INNER_CURVATURE, grippy), false);
+  const slippery = withParams({ offTrackDeceleration: 20 });
+  assert.ok(
+    stepOffTrack({ travel: 0, speed: 4 }, DT, slippery).speed
+      < stepOffTrack({ travel: 0, speed: 4 }, DT).speed,
+  );
 });
