@@ -6,9 +6,85 @@ The simulator uses a two-dimensional top-down view and reproduces the behavior o
 
 The project plans to build circuits from modular pieces, to handle several cars, to control the throttle, to time laps and to simulate races against computer-controlled opponents.
 
-The architecture is entirely client-side, based on JavaScript and native web technologies, with no dependency on application frameworks and no need for a server to run the simulation.
+The architecture is entirely client-side, based on JavaScript and native web technologies, with no dependency on application frameworks. The simulation needs no application server and no back end: the browser runs everything, and the files only have to be served as static files over HTTP (see [Running it](#running-it) for why opening `index.html` directly is not enough).
 
 The goal is a lightweight, extensible and accessible simulator that combines the fun of slot cars with experimenting with circuit geometry and the physics of motion.
+
+## Status
+
+This is a first playable prototype.
+
+**Works today**
+
+- A fixed oval circuit with an inner and an outer lane (the car runs on the inner one).
+- One car with a throttle, motor braking, friction and air drag.
+- A grip limit in curves: going too fast makes the car leave the track, slide a short way, and be put back on its lane after a pause.
+- Lap timing with a finish line, the last lap, the best lap, and laps marked as not valid when the car left the track.
+- Keyboard and touch controls, pause and restart.
+- An accessible timing panel, with events announced in a polite live region.
+
+**Planned**
+
+- Circuits built from modular pieces, more than one car, computer-controlled opponents, and races.
+
+## Running it
+
+You need [Node.js](https://nodejs.org/) 20 or later (the project is developed and tested with Node 24). It has no dependencies to install.
+
+```sh
+npm start
+```
+
+Then open <http://127.0.0.1:8080/>. To use another port: `npm start -- --port 8081`, or set the `PORT` environment variable.
+
+Browsers refuse to load ES modules from `file://` pages, so opening `index.html` with a double click does not work. `npm start` runs a minimal static file server (`scripts/serve.mjs`) that listens on the loopback address only. Any other static file server serves the project folder just as well.
+
+### Controls
+
+| Action | Keyboard | Touch or mouse |
+| --- | --- | --- |
+| Accelerate | Hold `Space` or `↑` | Hold the **Throttle** button |
+| Brake | Release the key | Release the button |
+| Pause or resume | `P` or `Esc` | **Pause** button |
+| Restart | `R` | **Restart** button |
+
+The throttle rises gradually while the key is held, in 0.4 seconds from nothing to full, and drops to zero as soon as it is released. A short tap therefore gives a partial throttle. At full throttle the car is too fast for the curves, so the way to a good lap is to dose the throttle.
+
+The game pauses by itself when the window loses the focus or the page is hidden.
+
+### Tests
+
+```sh
+npm test
+```
+
+This runs the tests with the test runner built into Node (`node --test`). They cover the geometry, the physics, the lap timer, the simulation, the controls, the content of the timing panel and the static server. The code that draws on the canvas and handles the page events is checked by hand in a browser and has no automated tests.
+
+## How it works
+
+- **Geometry** (`src/core/geometry.js`): a circuit is a closed chain of straights and circular arcs. The position, the heading and the curvature of every lane are computed in closed form, and every lane has its own length.
+- **Physics** (`src/core/physics.js`): the motor pushes less as the car speeds up, and there are rolling friction and air drag. In a curve the car needs a lateral acceleration of `v² · curvature`; above the grip limit it leaves the track. All values are parameters with their units documented in the file.
+- **Simulation** (`src/core/simulation.js`, `src/core/stepper.js`): the world advances in fixed steps of 1/120 s, whatever the frame rate, so results are deterministic. The drawing is interpolated between two steps.
+- **Lap timing** (`src/core/lapTimer.js`): the instant of each crossing of the finish line is interpolated inside the step, so lap times do not depend on the step size.
+- **Page** (`src/ui/`, `src/main.js`): the canvas drawing, the input handling and the timing panel.
+
+The logic in `src/core/` is pure: it does not touch the page, read a clock or use random numbers, so it also runs in Node.
+
+## Project layout
+
+```
+index.html, style.css, favicon.svg   the page
+src/main.js                          entry point and main loop
+src/core/                            pure logic: geometry, circuits, physics,
+                                     simulation, stepper, lap timer, controls, timing
+src/ui/                              canvas drawing, input, timing panel
+scripts/serve.mjs                    local static file server
+test/                                automated tests
+```
+
+## Publishing on GitHub Pages
+
+The project is made of static files with relative URLs, so it can be served from a sub-path such as `https://<user>.github.io/<repository>/`. In the repository settings, open **Pages**, choose **Deploy from a branch**, select the `master` branch and the `/ (root)` folder. No build step is needed.
 
 ## License
 
