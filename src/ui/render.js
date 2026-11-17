@@ -6,6 +6,9 @@
  * and flips the axis. All colors have enough contrast against their
  * background (at least 3:1 for graphics) and the car is also recognizable by
  * its shape, not only by its color.
+ *
+ * With the rule `tailSlide` the car is drawn as a body that may be turned away
+ * from the lane, with the guide pin, which stays on the lane, marked on it.
  */
 
 import { createLane } from '../core/geometry.js';
@@ -21,6 +24,8 @@ const PALETTE = Object.freeze({
   carBody: '#ffd400',
   carOutline: '#000000',
   carWindow: '#1b2430',
+  pinCore: '#000000',
+  pinRing: '#ffffff',
 });
 
 // Sizes in meters. A 1:32 car is about 13 cm long.
@@ -28,6 +33,13 @@ const EDGE_WIDTH = 0.012;
 const SLOT_WIDTH = 0.006;
 const CAR_LENGTH = 0.13;
 const CAR_WIDTH = 0.06;
+// The guide pin: a dark core in a light ring with a thin dark outline, so that
+// it stands out both on the yellow body and on the dark surface when the car is
+// off the track. WCAG contrast ratios of the neighbouring colors: core on ring
+// 21:1, outline on the yellow body 14.7:1, ring on the surface 10.6:1.
+const PIN_RADIUS = 0.009;
+const PIN_OUTLINE = 0.0015;
+const PIN_CORE_RATIO = 0.55;
 const CHECKER_DEPTH = 0.016;
 const CHECKER_CELLS = 8;
 const SAMPLE_SPACING = 0.02;
@@ -132,7 +144,26 @@ export function createRenderer(canvas, circuit, context) {
       // The windscreen marks the front of the car.
       surface.fillStyle = PALETTE.carWindow;
       surface.fillRect(length * 0.08, -carWidth * 0.35, length * 0.22, carWidth * 0.7);
+      if (context.tailSlide) drawPin();
     });
+  }
+
+  /**
+   * Draws the guide pin in the frame of the body: on the axis, in front of the
+   * center by `pinToCenterOfMass`. On the track it is the point on the lane
+   * that the rest of the car follows.
+   */
+  function drawPin() {
+    const x = context.params.pinToCenterOfMass * scale;
+    const disc = (radius, color) => {
+      surface.fillStyle = color;
+      surface.beginPath();
+      surface.arc(x, 0, radius * scale, 0, 2 * Math.PI);
+      surface.fill();
+    };
+    disc(PIN_RADIUS + PIN_OUTLINE, PALETTE.pinCore);
+    disc(PIN_RADIUS, PALETTE.pinRing);
+    disc(PIN_RADIUS * PIN_CORE_RATIO, PALETTE.pinCore);
   }
 
   /** Fits the canvas to its displayed size and to the screen density. */

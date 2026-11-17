@@ -2,7 +2,7 @@
 
 **OpenSlotCars** is an open source project for simulating slot car racing on electric tracks, running entirely in the browser.
 
-The simulator uses a two-dimensional top-down view and reproduces the behavior of small cars bound to the lanes of a circuit, modeling acceleration, braking, friction, centrifugal force and the possibility of leaving the track.
+The simulator uses a two-dimensional top-down view and reproduces the behavior of small cars bound to the lanes of a circuit, modeling acceleration, braking, friction, centrifugal force, a tail that slides out in curves and the possibility of leaving the track.
 
 The project plans to build circuits from modular pieces, to handle several cars, to control the throttle, to time laps and to simulate races against computer-controlled opponents.
 
@@ -18,7 +18,7 @@ This is a first playable prototype.
 
 - A fixed oval circuit with an inner and an outer lane (the car runs on the inner one).
 - One car with a throttle, motor braking, friction and air drag.
-- A grip limit in curves: going too fast makes the car leave the track, slide a short way, and be put back on its lane after a pause.
+- A car with a guide pin that follows the lane and a body that pivots about it. Going too fast in a curve makes the tail slide out, which costs speed; going much too fast turns the body so far that the car leaves the track, slides a short way, and is put back on its lane after a pause. The values of the body (distances, inertia, damping, spin-out angle) are estimates for a 1:32 car, not measurements.
 - Lap timing with a finish line, the last lap, the best lap, and laps marked as not valid when the car left the track.
 - Keyboard and touch controls, pause and restart.
 - An accessible timing panel, with events announced in a polite live region.
@@ -58,13 +58,13 @@ The game pauses by itself when the window loses the focus or the page is hidden.
 npm test
 ```
 
-This runs the tests with the test runner built into Node (`node --test`). They cover the geometry, the physics, the lap timer, the simulation, the logic of each frame (pause and restart included), the controls, the content of the timing panel, the static server and the handling of keyboard, pointer and focus events (run against simple stand-ins for the page, not a real browser). The drawing on the canvas, the wiring in `src/main.js` and the connection of the timing panel to the page have no automated tests and are checked by hand in a browser.
+This runs the tests with the test runner built into Node (`node --test`). They cover the geometry, the physics (the body and its sliding tail included), the lap timer, the simulation, the logic of each frame (pause and restart included), the controls, the content of the timing panel, the static server and the handling of keyboard, pointer and focus events (run against simple stand-ins for the page, not a real browser). The drawing on the canvas, the wiring in `src/main.js` and the connection of the timing panel to the page have no automated tests and are checked by hand in a browser.
 
 ## How it works
 
 - **Geometry** (`src/core/geometry.js`): a circuit is a closed chain of straights and circular arcs. The position, the heading and the curvature of every lane are computed in closed form, and every lane has its own length.
-- **Physics** (`src/core/physics.js`): the motor pushes less as the car speeds up, and there are rolling friction and air drag. In a curve the car needs a lateral acceleration of `v² · curvature`; above the grip limit it leaves the track. All values are parameters with their units documented in the file.
-- **Simulation** (`src/core/simulation.js`, `src/core/stepper.js`): the world advances in fixed steps of 1/120 s, whatever the frame rate, so results are deterministic. The drawing is interpolated between two steps.
+- **Physics** (`src/core/physics.js`): the motor pushes less as the car speeds up, and there are rolling friction and air drag. In a curve the car needs a lateral acceleration of `v² · curvature`. The guide pin stays on the lane and the body is a rigid bar hinged at the pin. The grip of the rear wheels is derived from the grip limit (`maxLateralAcceleration`): while it is enough, the tail rolls behind the pin, slightly inside the curve; above it the tail slides out gradually and the slide takes speed from the car. The car leaves the track only when the body has turned more than `maxSlipAngle` from the lane. All values are parameters with their units documented in the file.
+- **Simulation** (`src/core/simulation.js`, `src/core/stepper.js`): the world advances in fixed steps of 1/120 s, whatever the frame rate, so results are deterministic. The drawing is interpolated between two steps. The rule `tailSlide` turns the body model on, and the page does; with it off, which is the default of the module, the car is a single point on the lane and leaves the track as soon as the grip limit is exceeded. The body model needs a step shorter than the pin-to-axle distance over the free speed of the car (about 1/62 s with the default parameters), and the simulation refuses a longer one.
 - **Lap timing** (`src/core/lapTimer.js`): the instant of each crossing of the finish line is interpolated inside the step, which removes the rounding of lap times to a whole step. Their accuracy still depends on the physics step, because the motion is integrated only to first order: for a lap at a constant throttle the error against a much finer step is about 2.7 ms at the default 1/120 s and more than 10 ms at 1/30 s (see `test/simulation.test.js`).
 - **Frame logic** (`src/core/game.js`): what happens in each animation frame, including the pause (no time passes, and the time spent in pause is not made up for) and the restart.
 - **Page** (`src/ui/`, `src/main.js`): the canvas drawing, the input handling and the timing panel.

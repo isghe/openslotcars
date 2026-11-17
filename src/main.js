@@ -28,7 +28,7 @@ const hud = createHud({
 });
 
 const circuit = buildCircuit(OVAL);
-const context = createContext({ lane: circuit.lanes.inner });
+const context = createContext({ lane: circuit.lanes.inner, rules: { tailSlide: true } });
 const controls = createControls();
 const game = createGame({ context, controls });
 const renderer = createRenderer(canvas, circuit, context);
