@@ -77,6 +77,11 @@ export function createControls({ rampTime = THROTTLE_RAMP_TIME } = {}) {
       return true;
     },
 
+    /** Whether a throttle key is held down right now. */
+    isHeld(code) {
+      return heldKeys.has(code);
+    },
+
     /** A pointer (mouse, finger or pen) starts pressing the throttle button. */
     pointerDown(pointerId) {
       pressingPointers.add(pointerId);

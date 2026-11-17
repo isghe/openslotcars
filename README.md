@@ -58,7 +58,7 @@ The game pauses by itself when the window loses the focus or the page is hidden.
 npm test
 ```
 
-This runs the tests with the test runner built into Node (`node --test`). They cover the geometry, the physics, the lap timer, the simulation, the controls, the content of the timing panel and the static server. The code that draws on the canvas and handles the page events is checked by hand in a browser and has no automated tests.
+This runs the tests with the test runner built into Node (`node --test`). They cover the geometry, the physics, the lap timer, the simulation, the controls, the content of the timing panel, the static server and the handling of keyboard, pointer and focus events (run against simple stand-ins for the page, not a real browser). The drawing on the canvas, the main loop and the connection of the timing panel to the page have no automated tests and are checked by hand in a browser.
 
 ## How it works
 

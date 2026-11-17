@@ -171,3 +171,17 @@ test('invalid options and steps are rejected', () => {
   assert.throws(() => controls.step(0), RangeError);
   assert.throws(() => controls.step(Number.NaN), RangeError);
 });
+
+test('isHeld tells which throttle keys are down', () => {
+  const controls = createControls();
+  assert.equal(controls.isHeld('Space'), false);
+  controls.keyDown('Space');
+  assert.equal(controls.isHeld('Space'), true);
+  assert.equal(controls.isHeld('ArrowUp'), false);
+  controls.keyUp('Space');
+  assert.equal(controls.isHeld('Space'), false);
+  // Keys that are not throttle keys are never held.
+  controls.keyDown('KeyP');
+  assert.equal(controls.isHeld('KeyP'), false);
+  assert.equal(controls.isHeld('KeyZ'), false);
+});

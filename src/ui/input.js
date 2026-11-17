@@ -4,38 +4,56 @@
  *
  * Keys are read with `KeyboardEvent.code`, so they do not depend on the
  * keyboard layout. The game can be played without a mouse.
+ *
+ * The window and the document are parameters (they default to the real ones),
+ * so the behavior can be tested in Node with simple stand-ins.
  */
 
 /** Whether a key event comes from a field where the player is typing. */
 function isTypingTarget(target) {
-  return target instanceof HTMLElement
-    && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+  return Boolean(target)
+    && (target.isContentEditable === true
+      || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
 }
 
 /**
  * @param {{controls: object, throttleButton: HTMLElement, pauseButton: HTMLElement,
- *   restartButton: HTMLElement}} elements
+ *   restartButton: HTMLElement, windowTarget?: EventTarget,
+ *   documentTarget?: EventTarget & {hidden: boolean}}} elements
  */
-export function bindInput({ controls, throttleButton, pauseButton, restartButton }) {
+export function bindInput({
+  controls,
+  throttleButton,
+  pauseButton,
+  restartButton,
+  windowTarget = window,
+  documentTarget = document,
+}) {
   /**
    * Space on a focused button must activate that button, as usual; only the
    * throttle button hands Space over to the game.
    */
   function leavesKeyToButton(event) {
     return event.code === 'Space'
-      && event.target instanceof HTMLButtonElement
+      && event.target?.tagName === 'BUTTON'
       && event.target !== throttleButton;
   }
 
-  window.addEventListener('keydown', (event) => {
+  windowTarget.addEventListener('keydown', (event) => {
     if (event.ctrlKey || event.altKey || event.metaKey) return;
     if (isTypingTarget(event.target) || leavesKeyToButton(event)) return;
     if (controls.keyDown(event.code, { repeat: event.repeat })) event.preventDefault();
   });
 
-  window.addEventListener('keyup', (event) => {
-    if (leavesKeyToButton(event)) return;
-    if (controls.keyUp(event.code)) event.preventDefault();
+  windowTarget.addEventListener('keyup', (event) => {
+    // A release is always registered, whoever has the focus now: the press may
+    // have started on another element, before Tab moved the focus.
+    const endsGamePress = controls.isHeld(event.code);
+    const isGameKey = controls.keyUp(event.code);
+    // Space on a focused button belongs to that button, unless this release
+    // ends a press that the game started: then the browser must not also
+    // activate the button that received the focus in the meantime.
+    if (endsGamePress || (isGameKey && !leavesKeyToButton(event))) event.preventDefault();
   });
 
   // The throttle button: a pointer pressing it counts until it is released,
@@ -72,8 +90,8 @@ export function bindInput({ controls, throttleButton, pauseButton, restartButton
     controls.releaseAll();
     controls.setPaused(true);
   }
-  window.addEventListener('blur', interrupt);
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) interrupt();
+  windowTarget.addEventListener('blur', interrupt);
+  documentTarget.addEventListener('visibilitychange', () => {
+    if (documentTarget.hidden) interrupt();
   });
 }
