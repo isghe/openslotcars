@@ -191,9 +191,10 @@ test('a car sliding off the track slows down at the table deceleration', () => {
     steps += 1;
     assert.ok(steps < 1000, 'the car never stopped');
   }
-  // 4 m/s at 5 m/s^2 takes 0.8 s and covers v^2 / (2a) = 1.6 m.
-  near(steps * DT, 0.8, 2 * DT);
-  near(state.travel, 1.6, 0.02);
+  // From 4 m/s it takes v / a seconds and covers v^2 / (2a) meters.
+  const deceleration = DEFAULT_PARAMS.offTrackDeceleration;
+  near(steps * DT, 4 / deceleration, 2 * DT);
+  near(state.travel, 16 / (2 * deceleration), 0.02);
   assert.equal(state.speed, 0);
   assert.deepEqual(stepOffTrack(state, DT), state);
 });
@@ -210,7 +211,7 @@ test('the grip parameters can be overridden', () => {
   assert.ok(criticalSpeed(INNER_CURVATURE, grippy) > criticalSpeed(INNER_CURVATURE));
   assert.equal(hasLostGrip(2.2, INNER_CURVATURE), true);
   assert.equal(hasLostGrip(2.2, INNER_CURVATURE, grippy), false);
-  const slippery = withParams({ offTrackDeceleration: 20 });
+  const slippery = withParams({ offTrackDeceleration: 2 * DEFAULT_PARAMS.offTrackDeceleration });
   assert.ok(
     stepOffTrack({ travel: 0, speed: 4 }, DT, slippery).speed
       < stepOffTrack({ travel: 0, speed: 4 }, DT).speed,

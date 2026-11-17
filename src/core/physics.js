@@ -34,7 +34,9 @@
  * - `airDrag`: coefficient of the v^2 deceleration, 1/m.
  * - `maxLateralAcceleration`: grip limit in curves, m/s^2 (about 1.2 g with
  *   the magnet).
- * - `offTrackDeceleration`: deceleration of a car sliding on the table, m/s^2.
+ * - `offTrackDeceleration`: deceleration of a car that left the track, m/s^2.
+ *   It is much higher than plain sliding friction because the car bounces and
+ *   tumbles: from the top speed it stops after about half a meter.
  */
 export const DEFAULT_PARAMS = Object.freeze({
   spinUpAcceleration: 8,
@@ -43,7 +45,7 @@ export const DEFAULT_PARAMS = Object.freeze({
   rollingFriction: 0.5,
   airDrag: 0.02,
   maxLateralAcceleration: 12,
-  offTrackDeceleration: 5,
+  offTrackDeceleration: 20,
 });
 
 /**
