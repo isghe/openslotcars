@@ -130,6 +130,15 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * The current lap can read "1:04.213 s (off track)", which wraps onto a second
+ * line in a narrow tile. Two lines are always reserved, so that the tile keeps
+ * its height and the track below does not move when the car leaves the track.
+ */
+#current-lap {
+  min-height: 3em;
+}
+
 .site-footer {
   max-width: 1100px;
   margin: 0 auto;
