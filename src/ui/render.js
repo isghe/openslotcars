@@ -29,7 +29,6 @@ const PALETTE = Object.freeze({
   carWindow: '#1b2430',
   pinCore: '#000000',
   pinRing: '#ffffff',
-  tireMark: '#d7dbe2',
 });
 
 // Sizes in meters. A 1:32 car is about 13 cm long.
@@ -49,10 +48,21 @@ const PIN_CORE_RATIO = 0.55;
 // The marks of the sliding rear tires. The strongest fresh mark, from a hard
 // slide, is drawn at this opacity; a milder slide gives a fainter mark, in
 // proportion, and every mark fades out with time (see `tireMarks.js`). The
-// strongest has a contrast of 4.65:1 on the surface (WCAG ratio of the blended
-// color, rounded to 8 bits); the fainter ones are decorative and have less.
+// strongest of the cool marks has a contrast of 4.65:1 on the surface (WCAG
+// ratio of the blended color, rounded to 8 bits); the fainter ones are
+// decorative and have less.
+// The color follows how close the slide was to losing the car (the heat of the
+// mark, see `tireMarks.js`): light grey for a normal slide, red towards the
+// spin-out. A red at the opacity of the cool marks would be too dim on the dark
+// surface (about 2.6:1), so the opacity rises with the heat up to
+// `TIRE_MARK_HOT_OPACITY`; the hottest mark has a contrast of 3.94:1 (same way
+// of working it out). The strength still says how visible a mark is, so the
+// information is not only in the color.
 const TIRE_MARK_WIDTH = 0.008;
 const TIRE_MARK_OPACITY = 0.7;
+const TIRE_MARK_HOT_OPACITY = 1;
+const TIRE_MARK_COOL = Object.freeze([0xd7, 0xdb, 0xe2]);
+const TIRE_MARK_HOT = Object.freeze([0xff, 0x70, 0x70]);
 const CHECKER_DEPTH = 0.016;
 const CHECKER_CELLS = 8;
 const SAMPLE_SPACING = 0.02;
@@ -148,12 +158,15 @@ export function createRenderer(canvas, circuit, context) {
     const segments = tireMarks.segments(time);
     if (segments.length === 0) return;
     surface.save();
-    surface.strokeStyle = PALETTE.tireMark;
     surface.lineWidth = TIRE_MARK_WIDTH * scale;
     // Square ends, so that two joined segments do not overlap and show a bead.
     surface.lineCap = 'butt';
     for (const segment of segments) {
-      surface.globalAlpha = TIRE_MARK_OPACITY * segment.alpha * segment.strength;
+      const { heat } = segment;
+      const [red, green, blue] = TIRE_MARK_COOL.map((cool, i) => Math.round(cool + heat * (TIRE_MARK_HOT[i] - cool)));
+      surface.strokeStyle = `rgb(${red}, ${green}, ${blue})`;
+      const opacity = TIRE_MARK_OPACITY + heat * (TIRE_MARK_HOT_OPACITY - TIRE_MARK_OPACITY);
+      surface.globalAlpha = opacity * segment.alpha * segment.strength;
       const [x1, y1] = toCanvas(segment.x1, segment.y1);
       const [x2, y2] = toCanvas(segment.x2, segment.y2);
       surface.beginPath();

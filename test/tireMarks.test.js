@@ -164,6 +164,68 @@ test('the full intensity can be changed', () => {
   assert.ok(compared > 20);
 });
 
+test('a mark heats up from the full intensity to the hot intensity', () => {
+  // The heat starts where the strength stops growing, so that a normal fast lap
+  // stays cool and only a harder slide, towards the spin-out, gets hot.
+  const HOT = 0.7;
+  const marks = createTireMarks();
+  const history = play(context, 4, 1);
+  const seen = [];
+  for (let i = 0; i < history.length; i += 1) {
+    marks.record(history[i], context);
+    if (!(i > 0 && sliding(history[i]) && sliding(history[i - 1]))) continue;
+    const [segment] = marks.segments(history[i].time).filter((s) => s.alpha === 1);
+    const mean = (Math.min(1, intensityOf(history[i - 1])) + Math.min(1, intensityOf(history[i]))) / 2;
+    const expected = mean <= FULL ? 0 : Math.min(1, (mean - FULL) / (HOT - FULL));
+    near(segment.heat, expected, 1e-12, `step ${i}`);
+    seen.push({ mean, heat: segment.heat });
+  }
+  assert.ok(seen.some((s) => s.heat === 0), 'no cool mark');
+  assert.ok(seen.some((s) => s.heat > 0.1 && s.heat < 0.9), 'no mark in between');
+  assert.ok(seen.some((s) => s.heat === 1), 'no hot mark');
+  // A harder slide is never cooler.
+  seen.sort((a, b) => a.mean - b.mean);
+  for (let i = 1; i < seen.length; i += 1) assert.ok(seen[i].heat >= seen[i - 1].heat);
+});
+
+test('the heat uses the intensity capped at the whole rear grip, and its range can be changed', () => {
+  const history = play(context, 20, 0.6);
+  const index = history.findIndex((world, i) => i > 0 && sliding(world) && sliding(history[i - 1]));
+  const base = history[index - 1];
+  // Intensity 1 (the axle goes sideways three times faster than the car goes
+  // ahead, capped), then 0.1: the mean is 0.55. Without the cap it would be 1.55.
+  const at = (offset, rearSlip) => ({
+    ...history[index + offset],
+    car: { ...history[index + offset].car, speed: 1, rearSlip },
+  });
+  const fast = { ...base, car: { ...base.car, speed: 1, rearSlip: 3 } };
+  const gentle = at(0, 0.1);
+  const heatOf = (options, first, second) => {
+    const marks = createTireMarks(options);
+    marks.record(first, context);
+    marks.record(second, context);
+    return marks.segments(second.time)[0].heat;
+  };
+
+  // Range from 0.5 to 0.7: (0.55 - 0.5) / (0.7 - 0.5). Without the cap, 1.
+  near(heatOf({ fullIntensity: 0.5 }, fast, gentle), 0.25, 1e-12);
+  // Range from 0.4 to 1 (the whole rear grip).
+  near(heatOf({ hotIntensity: 1 }, fast, gentle), (0.55 - 0.4) / 0.6, 1e-12);
+  // A slide at the whole rear grip all along is as hot as it gets even with a
+  // hot intensity above 1, and not hotter than 1.
+  assert.equal(heatOf({ hotIntensity: 1 }, fast, at(0, 3)), 1);
+  near(heatOf({ hotIntensity: 2 }, fast, at(0, 3)), (1 - 0.4) / (2 - 0.4), 1e-12);
+
+  // Without a range (hot intensity not above the full intensity) a mark is cool
+  // up to the full intensity and hot above it.
+  assert.equal(heatOf({ fullIntensity: 0.5, hotIntensity: 0.5 }, fast, gentle), 1);
+  assert.equal(heatOf({ fullIntensity: 0.5, hotIntensity: 0.3 }, fast, gentle), 1);
+  assert.equal(heatOf({ fullIntensity: 0.5, hotIntensity: 0.5 }, gentle, at(1, 0.1)), 0);
+  // A full intensity of 1 or more leaves nothing above it.
+  assert.equal(heatOf({ fullIntensity: 1, hotIntensity: 1 }, fast, at(0, 3)), 0);
+  assert.equal(heatOf({ fullIntensity: 2 }, fast, gentle), 0);
+});
+
 test('the tail leaves its marks on the outside of the curve', () => {
   const marks = createTireMarks();
   let checked = 0;
@@ -355,7 +417,11 @@ test('the options are validated', () => {
   assert.throws(() => createTireMarks({ halfTrack: Number.POSITIVE_INFINITY }), RangeError);
   assert.throws(() => createTireMarks({ fullIntensity: 0 }), RangeError);
   assert.throws(() => createTireMarks({ fullIntensity: Number.NaN }), RangeError);
-  assert.doesNotThrow(() => createTireMarks({ lifetime: 1, halfTrack: 0.01, fullIntensity: 0.5 }));
+  assert.throws(() => createTireMarks({ hotIntensity: 0 }), RangeError);
+  assert.throws(() => createTireMarks({ hotIntensity: -0.5 }), RangeError);
+  assert.throws(() => createTireMarks({ hotIntensity: Number.NaN }), RangeError);
+  assert.throws(() => createTireMarks({ hotIntensity: Number.POSITIVE_INFINITY }), RangeError);
+  assert.doesNotThrow(() => createTireMarks({ lifetime: 1, halfTrack: 0.01, fullIntensity: 0.5, hotIntensity: 0.9 }));
 });
 
 test('recording does not modify the world', () => {

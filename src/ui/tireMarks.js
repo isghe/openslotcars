@@ -18,6 +18,11 @@
  * by `fullIntensity`, up to 1: proportional below it, and as strong as it gets
  * above it.
  *
+ * Each segment has a heat as well, which goes on where the strength stops: 0 up
+ * to `fullIntensity` and then rising in proportion to 1 at `hotIntensity`. The
+ * strength says how visible a mark is, the heat how close the slide was to
+ * losing the car; the page uses it to tint the mark.
+ *
  * Time is the time of the world, in seconds, so a pause (the same world again)
  * freezes the marks. A restart clears them: `reset` says so, and a world whose
  * time goes back does the same.
@@ -54,11 +59,23 @@ function slideIntensity(car) {
  *   as it gets. The default, 0.4, is about the hardest slide of a fast lap
  *   (measured on the oval: lap of 2.28 s, intensities up to 0.41, and 95% of
  *   the sliding steps below 0.3); harder slides, up to the spin-out, saturate.
+ *   `hotIntensity` is the intensity from which a mark is as hot as it gets. The
+ *   default, 0.7, is a choice of the drawing: the hardest slides of a hand-driven
+ *   lap, at the edge of the spin-out, were measured at 0.57 to 0.63 for a
+ *   stretch, and a slide at full throttle from a standstill ends at 0.88 when
+ *   the car spins out. If it is not above `fullIntensity` there is no range to
+ *   go through: a mark is cool up to `fullIntensity` and hot above it.
  */
-export function createTireMarks({ lifetime = 2, halfTrack = 0.022, fullIntensity = 0.4 } = {}) {
+export function createTireMarks({
+  lifetime = 2,
+  halfTrack = 0.022,
+  fullIntensity = 0.4,
+  hotIntensity = 0.7,
+} = {}) {
   checkPositive('lifetime', lifetime);
   checkPositive('halfTrack', halfTrack);
   checkPositive('fullIntensity', fullIntensity);
+  checkPositive('hotIntensity', hotIntensity);
 
   let marks = [];
   let lastTime = -Infinity;
@@ -122,7 +139,14 @@ export function createTireMarks({ lifetime = 2, halfTrack = 0.022, fullIntensity
       const current = wheelsOf(world, context);
       if (previous !== null && time - previous.time <= MAX_GAP) {
         // The mark is as strong as the slide was between the two worlds.
-        const strength = Math.min(1, (previous.intensity + current.intensity) / 2 / fullIntensity);
+        const intensity = (previous.intensity + current.intensity) / 2;
+        const strength = Math.min(1, intensity / fullIntensity);
+        let heat = 0;
+        if (intensity > fullIntensity) {
+          heat = hotIntensity > fullIntensity
+            ? Math.min(1, (intensity - fullIntensity) / (hotIntensity - fullIntensity))
+            : 1;
+        }
         for (const wheel of ['left', 'right']) {
           marks.push({
             x1: previous[wheel].x,
@@ -131,6 +155,7 @@ export function createTireMarks({ lifetime = 2, halfTrack = 0.022, fullIntensity
             y2: current[wheel].y,
             time,
             strength,
+            heat,
           });
         }
       }
@@ -140,11 +165,13 @@ export function createTireMarks({ lifetime = 2, halfTrack = 0.022, fullIntensity
     /**
      * The marks to draw at a given time, oldest first.
      * @param {number} time Time in seconds, normally that of the drawn world.
-     * @returns {Array<{x1: number, y1: number, x2: number, y2: number, alpha: number, strength: number}>}
+     * @returns {Array<{x1: number, y1: number, x2: number, y2: number, alpha: number, strength: number, heat: number}>}
      *   `alpha` is 1 for a mark just made and falls to 0 at the end of its
      *   lifetime; marks that are older than that are not returned. `strength`,
      *   above 0 and up to 1, follows how hard the tail slid; it does not change
      *   with time, so the mark to paint is as opaque as `alpha * strength`.
+     *   `heat`, from 0 to 1, is how far the slide went beyond the full intensity
+     *   (see the top of the file); it does not change with time either.
      */
     segments(time) {
       const visible = [];
@@ -158,6 +185,7 @@ export function createTireMarks({ lifetime = 2, halfTrack = 0.022, fullIntensity
           y2: mark.y2,
           alpha: Math.min(1, 1 - age / lifetime),
           strength: mark.strength,
+          heat: mark.heat,
         });
       }
       return visible;
