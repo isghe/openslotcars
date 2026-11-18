@@ -147,7 +147,26 @@ kbd {
 }
 
 .announcer {
+  /*
+   * The height is reserved for the longest announcements, so that the track
+   * does not move down when a message appears or changes. A message wraps onto
+   * more lines on a narrow screen, hence the steps. Measured in a browser with
+   * the longest sentence and with up to three sentences at once: one line
+   * suffices from about 900px, two from about 520px, three below that.
+   */
   min-height: 1.5em;
   margin: 0 0 12px;
   color: var(--page-text);
+}
+
+@media (max-width: 900px) {
+  .announcer {
+    min-height: 3em;
+  }
+}
+
+@media (max-width: 520px) {
+  .announcer {
+    min-height: 4.5em;
+  }
 }
