@@ -2,7 +2,7 @@
 
 A slot car racing simulator that runs in your browser. Keep the throttle down through a curve and the tail of the car slides out, leaving tire marks on the track.
 
-![A yellow slot car coming out of a curve under full throttle, its tail swung far out and two tire marks behind it](docs/screenshot.png)
+![A yellow slot car coming out of a curve under full throttle, its tail swung far out and two tire marks behind it that turn from grey to red](docs/screenshot.png)
 
 ## Play it online
 
