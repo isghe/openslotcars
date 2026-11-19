@@ -11,7 +11,7 @@ import { createControls } from './core/controls.js';
 import { createGame } from './core/game.js';
 import { createContext } from './core/simulation.js';
 import { createHud } from './ui/hud.js';
-import { bindCircuitSelect } from './ui/circuitSelect.js';
+import { addressWithCircuit, bindCircuitSelect, circuitFromSearch } from './ui/circuitSelect.js';
 import { bindInput } from './ui/input.js';
 import { createRenderer } from './ui/render.js';
 
@@ -47,13 +47,16 @@ function startCircuit(definition) {
   );
 }
 
-startCircuit(OVAL);
+// The circuit can be chosen in the address: `?circuit=chicane`. Without it, or
+// with a name that does not exist, the game starts on the oval.
+const firstCircuit = circuitFromSearch(window.location.search, CIRCUITS, OVAL);
+startCircuit(firstCircuit);
 hud.update(game.world);
 
 bindCircuitSelect({
   select: circuitSelect,
   circuits: CIRCUITS,
-  selectedId: OVAL.id,
+  selectedId: firstCircuit.id,
   onChange(id) {
     const definition = circuitById(id);
     startCircuit(definition);
@@ -61,6 +64,14 @@ bindCircuitSelect({
     controls.resetThrottle();
     controls.setPaused(false);
     hud.restart(game.world, `Circuit changed to ${definition.name}. Race restarted.`);
+    // The address names the circuit on the screen, so that reloading the page
+    // or sharing the address brings it back. The entry of the history is
+    // replaced, not added: the back button leaves the game as it always did.
+    window.history.replaceState(
+      window.history.state,
+      '',
+      addressWithCircuit(window.location.href, definition.id),
+    );
   },
 });
 
