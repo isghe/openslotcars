@@ -64,14 +64,21 @@ bindCircuitSelect({
     controls.resetThrottle();
     controls.setPaused(false);
     hud.restart(game.world, `Circuit changed to ${definition.name}. Race restarted.`);
-    // The address names the circuit on the screen, so that reloading the page
-    // or sharing the address brings it back. The entry of the history is
-    // replaced, not added: the back button leaves the game as it always did.
-    window.history.replaceState(
-      window.history.state,
-      '',
-      addressWithCircuit(window.location.href, definition.id),
-    );
+    // After a choice the address names the circuit on the screen, so that
+    // reloading the page or sharing the address brings it back. The entry of the
+    // history is replaced, not added: the back button leaves the game as it
+    // always did. If the browser refuses to change the address, the new circuit
+    // is already running and only the address stays as it was; the error must
+    // not escape, or the menu would keep the focus (see `bindCircuitSelect`).
+    try {
+      window.history.replaceState(
+        window.history.state,
+        '',
+        addressWithCircuit(window.location.href, definition.id),
+      );
+    } catch {
+      // Nothing else to do: the game does not depend on the address.
+    }
   },
 });
 
