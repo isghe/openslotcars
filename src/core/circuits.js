@@ -87,10 +87,14 @@ const WIDENING = [curve(0.35, -Math.PI / 2), curve(0.65, -Math.PI / 2)];
  * `S_BEND`), between a half turn that tightens and one that widens. The finish
  * line sits in the middle of the first straight, split in two halves of 0.6 m.
  * The return straight is 3.5 m long: that is the fast part of the circuit,
- * where the car can reach its top speed before the tight start of the second
- * half turn. The length closes the circuit: the half turns end at different
- * distances along the heading (0.3 m for the second one, about 0.52 m for the
- * first one) and the S-bend advances the track by about 0.28 m.
+ * where the car gets close to its top speed before the tight start of the
+ * second half turn. At full throttle it is at about 4 m/s at the end of it,
+ * from a standstill (3.99 m/s) as well as from 3 m/s (4.17 m/s); the speed at
+ * which the motor, the friction and the air drag balance is 4.44 m/s, and
+ * getting within 0.01 m/s of it takes 12.7 m. The length closes the circuit:
+ * the half turns end at different distances along the heading (0.3 m behind
+ * for the second one, about 0.52 m ahead for the first one) and the S-bend
+ * advances the track by about 0.28 m.
  */
 export const CHICANE = Object.freeze({
   id: 'chicane',
