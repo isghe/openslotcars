@@ -75,6 +75,31 @@ button[aria-pressed="true"] {
   background: #3a3300;
 }
 
+.circuit-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+select {
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 2px solid #aab2bd;
+  border-radius: 8px;
+  background: #1c222a;
+  color: var(--page-text);
+  font: inherit;
+}
+
+select:hover {
+  background: #252d38;
+}
+
+select:focus-visible {
+  outline: 3px solid #ffd400;
+  outline-offset: 2px;
+}
+
 #throttle {
   flex: 1 1 240px;
   min-height: 72px;

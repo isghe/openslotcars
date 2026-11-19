@@ -8,7 +8,7 @@ A slot car racing simulator that runs in your browser. Keep the throttle down th
 
 **<https://isghe.github.io/openslotcars/>**
 
-Hold `Space` (or the **Throttle** button on a touch screen) to accelerate and release it to brake. Too fast in a curve and the tail slides out; much too fast and the car leaves the track. Try to set the best lap time.
+Hold `Space` (or the **Throttle** button on a touch screen) to accelerate and release it to brake. Too fast in a curve and the tail slides out; much too fast and the car leaves the track. Try to set the best lap time, on the oval or on one of the other circuits in the **Circuit** menu below the track.
 
 ## Run it yourself, and how it works
 

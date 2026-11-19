@@ -103,6 +103,16 @@ test('the circuits are listed in order and found by identifier', () => {
   assert.throws(() => circuitById(undefined), RangeError);
 });
 
+test('every circuit has its own readable name, which the built circuit keeps', () => {
+  const names = CIRCUITS.map((circuit) => circuit.name);
+  for (const name of names) assert.ok(typeof name === 'string' && name.trim() === name && name !== '');
+  assert.equal(new Set(names).size, names.length);
+  assert.deepEqual(names, ['Oval', 'Speedway', 'Chicane', 'Teardrop']);
+  for (const definition of CIRCUITS) {
+    assert.equal(buildCircuit(definition).name, definition.name);
+  }
+});
+
 test('every circuit closes and has the expected lane lengths', () => {
   for (const definition of CIRCUITS) {
     const circuit = buildCircuit(definition);

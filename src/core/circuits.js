@@ -21,6 +21,7 @@ import { straight, curve, createTrack, createLane } from './geometry.js';
  */
 export const OVAL = Object.freeze({
   id: 'oval',
+  name: 'Oval',
   pieces: Object.freeze([
     straight(1),
     curve(0.4, Math.PI),
@@ -42,6 +43,7 @@ export const OVAL = Object.freeze({
  */
 export const SPEEDWAY = Object.freeze({
   id: 'speedway',
+  name: 'Speedway',
   pieces: Object.freeze([
     straight(1),
     curve(0.4, Math.PI / 2),
@@ -67,6 +69,7 @@ export const SPEEDWAY = Object.freeze({
  */
 export const CHICANE = Object.freeze({
   id: 'chicane',
+  name: 'Chicane',
   pieces: Object.freeze([
     straight(0.25),
     curve(0.5, -Math.PI / 6),
@@ -99,6 +102,7 @@ const TEARDROP_STRAIGHT = Math.sqrt(1.5 ** 2 - (0.6 - 0.3) ** 2);
  */
 export const TEARDROP = Object.freeze({
   id: 'teardrop',
+  name: 'Teardrop',
   pieces: Object.freeze([
     straight(TEARDROP_STRAIGHT / 2),
     curve(0.3, Math.PI - 2 * TEARDROP_TILT),
@@ -129,9 +133,9 @@ export function circuitById(id) {
 
 /**
  * Builds the track and the lanes of a circuit definition.
- * @param {{id: string, pieces: Array<object>, start: object,
+ * @param {{id: string, name: string, pieces: Array<object>, start: object,
  *   trackWidth: number, lanes: Object<string, number>}} definition
- * @returns {{id: string, trackWidth: number, track: object,
+ * @returns {{id: string, name: string, trackWidth: number, track: object,
  *   lanes: Object<string, object>}}
  */
 export function buildCircuit(definition) {
@@ -140,5 +144,5 @@ export function buildCircuit(definition) {
   for (const [name, offset] of Object.entries(definition.lanes)) {
     lanes[name] = createLane(track, offset);
   }
-  return { id: definition.id, trackWidth: definition.trackWidth, track, lanes };
+  return { id: definition.id, name: definition.name, trackWidth: definition.trackWidth, track, lanes };
 }
