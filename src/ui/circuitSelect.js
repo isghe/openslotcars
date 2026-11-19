@@ -35,10 +35,10 @@ export function circuitFromSearch(search, circuits, fallback) {
 }
 
 /**
- * The page address with the `circuit` argument set to a circuit, so that the
- * address of the page always names the circuit on the screen. The other
- * arguments and the fragment are kept; a repeated `circuit` argument becomes a
- * single one.
+ * The page address with the `circuit` argument set to a circuit, so that after
+ * a choice made from the menu the address names the circuit on the screen. (The
+ * address of a page that has just opened is not changed.) The other arguments
+ * and the fragment are kept; a repeated `circuit` argument becomes a single one.
  * @param {string} href The current address of the page.
  * @param {string} id Identifier of the circuit.
  * @returns {string}

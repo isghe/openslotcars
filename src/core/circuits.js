@@ -66,9 +66,9 @@ export const SPEEDWAY = Object.freeze({
 // Two long curves of 135 degrees and radius 0.20 m, to the left and then to
 // the right: an S that shifts the track sideways by about 0.68 m and brings it
 // back to its heading. Each curve is tighter than the half turns, and long
-// enough for the tail to slide out and the car to spin out. (Curves of 45
-// degrees, tried before, were too short for that: the car never left the track
-// in them, at any speed.)
+// enough for the tail to slide out and the car to spin out: at a constant speed
+// the car leaves the track in an S-bend from about 2 m/s. (Two curves of 45
+// degrees and the same radius, tried before, need about 3 m/s.)
 const S_BEND = [curve(0.2, (3 * Math.PI) / 4), curve(0.2, (-3 * Math.PI) / 4)];
 
 // The two half turns of the chicane are each made of two quarter circles of
