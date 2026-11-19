@@ -61,30 +61,36 @@ export const SPEEDWAY = Object.freeze({
 });
 
 // The chicane is driven clockwise, unlike the other circuits: its curves are
-// right turns (negative angles) or, in the S-bends, a left and a right one.
+// right turns (negative angles) or, in the S-bend, a left and a right one.
 //
 // Two long curves of 135 degrees and radius 0.20 m, to the left and then to
-// the right: an S that shifts the track sideways by about 0.68 m and brings it
-// back to its heading. Each curve is tighter than the half turns, and long
-// enough for the tail to slide out and the car to spin out: at a constant speed
-// the car leaves the track in an S-bend from about 2 m/s. (Two curves of 45
-// degrees and the same radius, tried before, need about 3.4 m/s.)
+// the right: an S that shifts the track sideways by about 0.68 m (`S_SHIFT`)
+// and brings it back to its heading. Each curve is tighter than the half turns,
+// and long enough for the tail to slide out and the car to spin out: at a
+// constant speed the car leaves the track in the S-bend from about 2 m/s. (Two
+// curves of 45 degrees and the same radius, tried before, need about 3.4 m/s.)
 const S_BEND = [curve(0.2, (3 * Math.PI) / 4), curve(0.2, (-3 * Math.PI) / 4)];
+const S_SHIFT = 2 * 0.2 * (1 + Math.SQRT1_2);
 
-// The two half turns of the chicane are each made of two quarter circles of
-// radius 0.65 m and 0.35 m. The first one starts wide and tightens; the second
-// one starts tight and widens. Both shift the track sideways by 1.0 m, so the
-// S-bends fit between the two sides, but the second one ends 0.6 m less far
-// along the heading than the first one: the straights of the second side are
-// 0.3 m longer at each end to make up for it, so that the circuit closes.
-const TIGHTENING = [curve(0.65, -Math.PI / 2), curve(0.35, -Math.PI / 2)];
+// The two half turns of the chicane are each made of two quarter circles. The
+// first one starts wide and tightens; the second one starts tight and widens.
+// The second one shifts the track sideways by 1.0 m (radii 0.35 m and 0.65 m).
+// The first one shifts it by 1.0 m plus `S_SHIFT`, which cancels the shift of
+// the S-bend: the long straight that follows leads straight to the second half
+// turn, with no second S-bend. The radii of the first half turn are 1.1 m and
+// whatever is left to make up that shift (about 0.58 m).
+const TIGHTENING = [curve(1.1, -Math.PI / 2), curve(1 + S_SHIFT - 1.1, -Math.PI / 2)];
 const WIDENING = [curve(0.35, -Math.PI / 2), curve(0.65, -Math.PI / 2)];
 
 /**
- * An oval driven clockwise, with an S-bend on each straight (see `S_BEND`),
- * between a half turn that tightens and one that widens. The straights are
- * 1.2 m long on the first side and 1.5 m on the second one. The finish line
- * sits in the middle of the first straight, split in two halves of 0.6 m.
+ * An oval driven clockwise, with an S-bend on the first straight (see
+ * `S_BEND`), between a half turn that tightens and one that widens. The finish
+ * line sits in the middle of the first straight, split in two halves of 0.6 m.
+ * The return straight is 3.5 m long: that is the fast part of the circuit,
+ * where the car can reach its top speed before the tight start of the second
+ * half turn. The length closes the circuit: the half turns end at different
+ * distances along the heading (0.3 m for the second one, about 0.52 m for the
+ * first one) and the S-bend advances the track by about 0.28 m.
  */
 export const CHICANE = Object.freeze({
   id: 'chicane',
@@ -94,9 +100,7 @@ export const CHICANE = Object.freeze({
     ...S_BEND,
     straight(1.2),
     ...TIGHTENING,
-    straight(1.5),
-    ...S_BEND,
-    straight(1.5),
+    straight(3.5),
     ...WIDENING,
     straight(0.6),
   ]),
