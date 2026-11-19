@@ -80,11 +80,13 @@ const STRAIGHT = Math.sqrt(1.5 ** 2 - 0.3 ** 2);
 const EXPECTED_LENGTHS = {
   oval: { inner: 4 + 0.7 * Math.PI, outer: 4 + 0.9 * Math.PI },
   speedway: { inner: 6 + 0.7 * Math.PI, outer: 6 + 0.9 * Math.PI },
-  // 2 m of straights, two half circles and, per chicane, a right curve and a
-  // left curve of 30 degrees whose lane radii add up to 1 m.
+  // 5.4 m of straights (0.6 + 1.2 + 1.5 + 1.5 + 0.6), two half turns made of
+  // quarter circles of radius 0.65 m and 0.35 m (the radii of the lanes of each
+  // half turn add up to 0.9 m or 1.1 m) and four curves of 135 degrees that
+  // come in pairs (right and left), whose lane radii add up to 0.4 m.
   chicane: {
-    inner: 2 + 0.7 * Math.PI + Math.PI / 3,
-    outer: 2 + 0.9 * Math.PI + Math.PI / 3,
+    inner: 5.4 + 0.9 * Math.PI + 0.6 * Math.PI,
+    outer: 5.4 + 1.1 * Math.PI + 0.6 * Math.PI,
   },
   teardrop: {
     inner: 2 * STRAIGHT + 0.25 * (Math.PI - 2 * TILT) + 0.55 * (Math.PI + 2 * TILT),
@@ -156,16 +158,65 @@ test('the finish line of every circuit lies on a straight, heading along it', ()
   }
 });
 
-test('the chicane sends the track to the right and then back to its heading', () => {
-  const track = buildCircuit(CHICANE).track;
-  const [, right, left, ...rest] = track.pieces;
-  assert.ok(right.angle < 0 && left.angle > 0);
-  near(right.end.heading + (left.angle), left.end.heading);
-  near(left.end.heading, CHICANE.start.heading);
-  // Right of travel is below the axis (y grows upwards in the model).
-  assert.ok(left.end.y < 0);
-  near(left.end.y, -2 * 0.5 * (1 - Math.cos(Math.PI / 6)));
-  assert.ok(rest.length > 0);
+test('each straight of the chicane circuit has an S-bend: a long curve left, then right', () => {
+  const { pieces } = buildCircuit(CHICANE).track;
+  // Straight, S-bend, straight, half turn (two curves), straight, S-bend,
+  // straight, half turn (two curves), straight.
+  assert.equal(pieces.length, 13);
+  const sBends = [pieces.slice(1, 3), pieces.slice(7, 9)];
+  for (const [left, right] of sBends) {
+    assert.ok(left.angle > 0 && right.angle < 0);
+    near(left.angle, (3 * Math.PI) / 4);
+    near(right.angle, (-3 * Math.PI) / 4);
+    // Tighter than the half turns: this is what makes the car slow down.
+    assert.equal(left.radius, 0.2);
+    assert.equal(right.radius, 0.2);
+    // The S-bend brings the track back to its heading, to the left of where it
+    // started. Distances are measured along and across that heading: the
+    // second S-bend is driven the other way round.
+    near(right.end.heading, left.start.heading);
+    const { heading } = left.start;
+    const dx = right.end.x - left.start.x;
+    const dy = right.end.y - left.start.y;
+    near(dx * Math.cos(heading) + dy * Math.sin(heading), 2 * 0.2 * Math.SQRT1_2, 1e-9, 'along');
+    near(-dx * Math.sin(heading) + dy * Math.cos(heading), 2 * 0.2 * (1 + Math.SQRT1_2), 1e-9, 'across');
+  }
+});
+
+test('the first half turn of the chicane circuit tightens and the second widens', () => {
+  const { pieces } = buildCircuit(CHICANE).track;
+  const first = pieces.slice(4, 6);
+  const second = pieces.slice(10, 12);
+  for (const piece of [...first, ...second]) {
+    assert.equal(piece.type, 'curve');
+    near(piece.angle, -Math.PI / 2);
+  }
+  assert.deepEqual(first.map((piece) => piece.radius), [0.65, 0.35]);
+  assert.deepEqual(second.map((piece) => piece.radius), [0.35, 0.65]);
+  // Each half turn turns the heading around, clockwise, and shifts the track
+  // 1.0 m sideways, to the right.
+  for (const [a, b] of [first, second]) {
+    near(b.end.heading - a.start.heading, -Math.PI);
+    const { heading } = a.start;
+    const dx = b.end.x - a.start.x;
+    const dy = b.end.y - a.start.y;
+    near(-dx * Math.sin(heading) + dy * Math.cos(heading), -1.0, 1e-9, 'sideways');
+  }
+});
+
+test('the chicane is driven clockwise and the oval counterclockwise, each on its shorter lane', () => {
+  const turning = (definition) => buildCircuit(definition).track.pieces
+    .reduce((sum, piece) => sum + (piece.type === 'curve' ? piece.angle : 0), 0);
+  near(turning(CHICANE), -2 * Math.PI);
+  near(turning(OVAL), 2 * Math.PI);
+  // The inside of the circuit is to the right when driving clockwise (negative
+  // offset) and to the left otherwise, and the car runs on the inner lane.
+  assert.ok(CHICANE.lanes.inner < 0 && CHICANE.lanes.outer > 0);
+  assert.ok(OVAL.lanes.inner > 0 && OVAL.lanes.outer < 0);
+  for (const definition of [CHICANE, OVAL]) {
+    const { lanes } = buildCircuit(definition);
+    assert.ok(lanes.inner.length < lanes.outer.length, definition.id);
+  }
 });
 
 test('the teardrop has a hairpin and a wide curve that add up to a full turn', () => {

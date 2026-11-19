@@ -60,32 +60,51 @@ export const SPEEDWAY = Object.freeze({
   lanes: Object.freeze({ inner: 0.05, outer: -0.05 }),
 });
 
+// The chicane is driven clockwise, unlike the other circuits: its curves are
+// right turns (negative angles) or, in the S-bends, a left and a right one.
+//
+// Two long curves of 135 degrees and radius 0.20 m, to the left and then to
+// the right: an S that shifts the track sideways by about 0.68 m and brings it
+// back to its heading. Each curve is tighter than the half turns, and long
+// enough for the tail to slide out and the car to spin out. (Curves of 45
+// degrees, tried before, were too short for that: the car never left the track
+// in them, at any speed.)
+const S_BEND = [curve(0.2, (3 * Math.PI) / 4), curve(0.2, (-3 * Math.PI) / 4)];
+
+// The two half turns of the chicane are each made of two quarter circles of
+// radius 0.65 m and 0.35 m. The first one starts wide and tightens; the second
+// one starts tight and widens. Both shift the track sideways by 1.0 m, so the
+// S-bends fit between the two sides, but the second one ends 0.6 m less far
+// along the heading than the first one: the straights of the second side are
+// 0.3 m longer at each end to make up for it, so that the circuit closes.
+const TIGHTENING = [curve(0.65, -Math.PI / 2), curve(0.35, -Math.PI / 2)];
+const WIDENING = [curve(0.35, -Math.PI / 2), curve(0.65, -Math.PI / 2)];
+
 /**
- * A short oval with a chicane on each straight: two curves of 30 degrees and
- * radius 0.50 m, first to the right and then to the left, which shift the
- * track sideways by about 0.13 m and bring it back to its heading. The two
- * half circles have a radius of 0.40 m. The finish line sits in the middle of
- * the straight that holds the first chicane.
+ * An oval driven clockwise, with an S-bend on each straight (see `S_BEND`),
+ * between a half turn that tightens and one that widens. The straights are
+ * 1.2 m long on the first side and 1.5 m on the second one. The finish line
+ * sits in the middle of the first straight, split in two halves of 0.6 m.
  */
 export const CHICANE = Object.freeze({
   id: 'chicane',
   name: 'Chicane',
   pieces: Object.freeze([
-    straight(0.25),
-    curve(0.5, -Math.PI / 6),
-    curve(0.5, Math.PI / 6),
-    straight(0.5),
-    curve(0.4, Math.PI),
-    straight(0.5),
-    curve(0.5, -Math.PI / 6),
-    curve(0.5, Math.PI / 6),
-    straight(0.5),
-    curve(0.4, Math.PI),
-    straight(0.25),
+    straight(0.6),
+    ...S_BEND,
+    straight(1.2),
+    ...TIGHTENING,
+    straight(1.5),
+    ...S_BEND,
+    straight(1.5),
+    ...WIDENING,
+    straight(0.6),
   ]),
   start: Object.freeze({ x: 0, y: 0, heading: 0 }),
   trackWidth: 0.2,
-  lanes: Object.freeze({ inner: 0.05, outer: -0.05 }),
+  // The inside of a clockwise circuit is to the right of the direction of
+  // travel, so the offsets are the opposite of those of the oval.
+  lanes: Object.freeze({ inner: -0.05, outer: 0.05 }),
 });
 
 // Teardrop: a wide curve of radius 0.60 m and a hairpin of radius 0.30 m,
