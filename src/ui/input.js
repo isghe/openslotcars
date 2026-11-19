@@ -58,13 +58,49 @@ export function bindInput({
 
   // The throttle button: a pointer pressing it counts until it is released,
   // moves away or is cancelled, so the throttle never stays stuck.
+  //
+  // A touch screen can still lose the release (a system gesture, a finger that
+  // slides off the screen edge): the throttle would then stay on, and neither
+  // Restart nor another tap would end it. Three safeguards undo that, each
+  // working on the touch fingers only, so a mouse press or a key is never
+  // released by them.
+  const touchPointers = new Set();
+
+  function releasePointer(pointerId) {
+    touchPointers.delete(pointerId);
+    controls.pointerUp(pointerId);
+  }
+
+  function releaseTouches() {
+    for (const pointerId of touchPointers) controls.pointerUp(pointerId);
+    touchPointers.clear();
+  }
+
   throttleButton.addEventListener('pointerdown', (event) => {
     throttleButton.setPointerCapture?.(event.pointerId);
+    if (event.pointerType === 'touch') {
+      // 1. The primary touch is the first finger of a gesture: no other finger
+      //    can be on the screen, so any finger still counted is a lost one.
+      if (event.isPrimary) releaseTouches();
+      touchPointers.add(event.pointerId);
+    }
     controls.pointerDown(event.pointerId);
     event.preventDefault();
   });
-  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-    throttleButton.addEventListener(type, (event) => controls.pointerUp(event.pointerId));
+  // 2. The release may be sent to the window and not to the button.
+  for (const target of [throttleButton, windowTarget]) {
+    for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+      target.addEventListener(type, (event) => releasePointer(event.pointerId));
+    }
+  }
+  // 3. Any touch event lists the fingers that are on the screen right now: if
+  //    none is on the throttle button, no touch can be pressing it.
+  for (const type of ['touchstart', 'touchend', 'touchcancel']) {
+    windowTarget.addEventListener(type, (event) => {
+      const onThrottle = Array.from(event.touches ?? [])
+        .some((touch) => touch.target === throttleButton);
+      if (!onThrottle) releaseTouches();
+    }, { passive: true });
   }
   // A long press on a touch screen would open a context menu.
   throttleButton.addEventListener('contextmenu', (event) => event.preventDefault());

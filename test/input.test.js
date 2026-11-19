@@ -182,6 +182,91 @@ test('a pointer on the throttle button holds the throttle until it is released',
   }
 });
 
+/** A pointer event on the throttle button, as a touch screen sends it. */
+function touchDown(id, { isPrimary = true } = {}) {
+  return {
+    pointerId: id, pointerType: 'touch', isPrimary, preventDefault() {},
+  };
+}
+
+test('a touch whose release never arrives does not keep the throttle after the next touch', () => {
+  const { controls, throttleButton } = setup();
+  // First finger: the browser loses its release (no pointerup, pointercancel
+  // or lostpointercapture ever reaches the page).
+  throttleButton.fire('pointerdown', touchDown(7));
+  assert.equal(controls.demanding, true);
+
+  // Second tap: a primary pointer going down means no other touch is on the
+  // screen, so the first one can only be a ghost.
+  throttleButton.fire('pointerdown', touchDown(8));
+  throttleButton.fire('pointerup', { pointerId: 8 });
+  assert.equal(controls.demanding, false);
+});
+
+test('a second finger on the throttle button does not drop the first', () => {
+  const { controls, throttleButton } = setup();
+  throttleButton.fire('pointerdown', touchDown(1));
+  throttleButton.fire('pointerdown', touchDown(2, { isPrimary: false }));
+  throttleButton.fire('pointerup', { pointerId: 2 });
+  assert.equal(controls.demanding, true);
+  throttleButton.fire('pointerup', { pointerId: 1 });
+  assert.equal(controls.demanding, false);
+});
+
+test('a touch event that shows no finger on the throttle button releases a lost touch', () => {
+  for (const type of ['touchstart', 'touchend', 'touchcancel']) {
+    const { controls, windowTarget, throttleButton, restartButton } = setup();
+    throttleButton.fire('pointerdown', touchDown(5));
+    // Another finger lands on Restart; the one on the throttle is not in the list.
+    windowTarget.fire(type, { touches: [{ target: restartButton }] });
+    assert.equal(controls.demanding, false, type);
+  }
+});
+
+test('a touch event with a finger still on the throttle button keeps the throttle', () => {
+  const { controls, windowTarget, throttleButton, restartButton } = setup();
+  throttleButton.fire('pointerdown', touchDown(5));
+  windowTarget.fire('touchstart', { touches: [{ target: throttleButton }, { target: restartButton }] });
+  windowTarget.fire('touchend', { touches: [{ target: throttleButton }] });
+  assert.equal(controls.demanding, true);
+  windowTarget.fire('touchend', { touches: [] });
+  assert.equal(controls.demanding, false);
+});
+
+test('touch events do not release a mouse press', () => {
+  const { controls, windowTarget, throttleButton } = setup();
+  throttleButton.fire('pointerdown', { pointerId: 1, pointerType: 'mouse', isPrimary: true, preventDefault() {} });
+  windowTarget.fire('touchstart', { touches: [{ target: body }] });
+  windowTarget.fire('touchend', { touches: [] });
+  assert.equal(controls.demanding, true);
+  throttleButton.fire('pointerup', { pointerId: 1 });
+  assert.equal(controls.demanding, false);
+});
+
+test('a new touch leaves a mouse press alone, and touch events leave a held key alone', () => {
+  const { controls, windowTarget, throttleButton, key } = setup();
+  throttleButton.fire('pointerdown', { pointerId: 1, pointerType: 'mouse', isPrimary: true, preventDefault() {} });
+  throttleButton.fire('pointerdown', touchDown(9));
+  throttleButton.fire('pointerup', { pointerId: 9 });
+  assert.equal(controls.demanding, true, 'mouse still pressing');
+  throttleButton.fire('pointerup', { pointerId: 1 });
+  assert.equal(controls.demanding, false);
+
+  key('keydown', 'Space', body);
+  windowTarget.fire('touchstart', { touches: [{ target: body }] });
+  windowTarget.fire('touchend', { touches: [] });
+  assert.equal(controls.demanding, true, 'key still held');
+});
+
+test('a release that reaches the window and not the button still ends the press', () => {
+  for (const ending of ['pointerup', 'pointercancel']) {
+    const { controls, windowTarget, throttleButton } = setup();
+    throttleButton.fire('pointerdown', touchDown(4));
+    windowTarget.fire(ending, { pointerId: 4 });
+    assert.equal(controls.demanding, false, ending);
+  }
+});
+
 test('the context menu is blocked on the throttle button', () => {
   const { throttleButton } = setup();
   const event = { defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
