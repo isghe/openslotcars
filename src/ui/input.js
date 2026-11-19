@@ -60,10 +60,11 @@ export function bindInput({
   // moves away or is cancelled, so the throttle never stays stuck.
   //
   // A touch screen can still lose the release (a system gesture, a finger that
-  // slides off the screen edge): the throttle would then stay on, and neither
-  // Restart nor another tap would end it. Three safeguards undo that, each
-  // working on the touch fingers only, so a mouse press or a key is never
-  // released by them.
+  // slides off the screen edge): the throttle would then stay on. Three
+  // safeguards undo that, each working on the touch fingers only, so a mouse
+  // press or a key is never released by them. They act on the next touch of the
+  // screen, a touch on Restart included. The R key and a mouse click on Restart
+  // do not end a lost touch: a restart only resets the level of the throttle.
   const touchPointers = new Set();
 
   function releasePointer(pointerId) {
