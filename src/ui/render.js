@@ -65,6 +65,14 @@ const TIRE_MARK_COOL = Object.freeze([0xd7, 0xdb, 0xe2]);
 const TIRE_MARK_HOT = Object.freeze([0xff, 0x70, 0x70]);
 const CHECKER_DEPTH = 0.016;
 const CHECKER_CELLS = 8;
+// The chevron after the finish line that shows the direction of travel. It is
+// narrower than the distance between the slots (0.10 m), so it does not cover
+// them, and it starts beyond the checkered line (which ends at 0.016 m).
+const DIRECTION_MARK_START = 0.05;
+const DIRECTION_MARK_DEPTH = 0.04;
+const DIRECTION_MARK_HALF_HEIGHT = 0.03;
+const DIRECTION_MARK_WIDTH = 0.012;
+const DIRECTION_MARK_OPACITY = 0.85;
 const SAMPLE_SPACING = 0.02;
 const MARGIN = 0.06;
 
@@ -150,7 +158,29 @@ export function createRenderer(canvas, circuit, context) {
           );
         }
       }
+      drawDirectionMark();
     });
+  }
+
+  /**
+   * Draws a chevron on the center of the track, just after the checkered line,
+   * pointing along the direction of travel. The car starts behind the line, so
+   * it does not hide the mark. In the frame of the pose, with the x axis along
+   * the heading.
+   */
+  function drawDirectionMark() {
+    surface.save();
+    surface.globalAlpha = DIRECTION_MARK_OPACITY;
+    surface.strokeStyle = PALETTE.checkerLight;
+    surface.lineWidth = DIRECTION_MARK_WIDTH * scale;
+    surface.lineJoin = 'miter';
+    surface.lineCap = 'butt';
+    surface.beginPath();
+    surface.moveTo(DIRECTION_MARK_START * scale, -DIRECTION_MARK_HALF_HEIGHT * scale);
+    surface.lineTo((DIRECTION_MARK_START + DIRECTION_MARK_DEPTH) * scale, 0);
+    surface.lineTo(DIRECTION_MARK_START * scale, DIRECTION_MARK_HALF_HEIGHT * scale);
+    surface.stroke();
+    surface.restore();
   }
 
   /** Draws the marks that the sliding rear tires left, fading out with time. */
