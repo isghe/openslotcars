@@ -67,7 +67,7 @@ function slideIntensity(car) {
  *   go through: a mark is cool up to `fullIntensity` and hot above it.
  */
 export function createTireMarks({
-  lifetime = 2,
+  lifetime = 4,
   halfTrack = 0.022,
   fullIntensity = 0.4,
   hotIntensity = 0.7,
