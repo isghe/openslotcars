@@ -258,6 +258,49 @@ test('a new touch leaves a mouse press alone, and touch events leave a held key 
   assert.equal(controls.demanding, true, 'key still held');
 });
 
+test('R ends a lost touch, so the throttle does not come back after the restart', () => {
+  const { controls, throttleButton, key } = setup();
+  throttleButton.fire('pointerdown', touchDown(7));
+  assert.equal(controls.demanding, true);
+  key('keydown', 'KeyR', body);
+  assert.equal(controls.takeRestart(), true);
+  assert.equal(controls.demanding, false);
+});
+
+test('a held R, or R typed in a field or with a modifier, does not end a touch', () => {
+  const { controls, throttleButton, key } = setup();
+  throttleButton.fire('pointerdown', touchDown(7));
+  key('keydown', 'KeyR', body, { repeat: true });
+  key('keydown', 'KeyR', { tagName: 'INPUT' });
+  key('keydown', 'KeyR', body, { ctrlKey: true });
+  assert.equal(controls.demanding, true);
+});
+
+test('a click on Restart from a mouse or the keyboard ends a lost touch, one from a touch does not', () => {
+  for (const [pointerType, ends] of [['mouse', true], ['', true], ['touch', false], ['pen', false], [undefined, false]]) {
+    const { controls, throttleButton, restartButton } = setup();
+    throttleButton.fire('pointerdown', touchDown(7));
+    restartButton.fire('click', { detail: 1, pointerType });
+    assert.equal(controls.takeRestart(), true);
+    assert.equal(controls.demanding, !ends, String(pointerType));
+  }
+});
+
+test('R and a click on Restart leave a mouse press and a held key alone', () => {
+  const { controls, throttleButton, restartButton, key } = setup();
+  throttleButton.fire('pointerdown', { pointerId: 1, pointerType: 'mouse', isPrimary: true, preventDefault() {} });
+  key('keydown', 'KeyR', body);
+  restartButton.fire('click', { detail: 1, pointerType: 'mouse' });
+  assert.equal(controls.demanding, true, 'mouse still pressing');
+  throttleButton.fire('pointerup', { pointerId: 1 });
+  assert.equal(controls.demanding, false);
+
+  key('keydown', 'Space', body);
+  key('keydown', 'KeyR', body);
+  restartButton.fire('click', { detail: 1, pointerType: 'mouse' });
+  assert.equal(controls.demanding, true, 'key still held');
+});
+
 test('a release that reaches the window and not the button still ends the press', () => {
   for (const ending of ['pointerup', 'pointercancel']) {
     const { controls, windowTarget, throttleButton } = setup();

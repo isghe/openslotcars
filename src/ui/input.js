@@ -9,6 +9,8 @@
  * so the behavior can be tested in Node with simple stand-ins.
  */
 
+import { KEY_ACTIONS } from '../core/controls.js';
+
 /** Whether a key event comes from a field where the player is typing. */
 function isTypingTarget(target) {
   return Boolean(target)
@@ -42,7 +44,11 @@ export function bindInput({
   windowTarget.addEventListener('keydown', (event) => {
     if (event.ctrlKey || event.altKey || event.metaKey) return;
     if (isTypingTarget(event.target) || leavesKeyToButton(event)) return;
-    if (controls.keyDown(event.code, { repeat: event.repeat })) event.preventDefault();
+    if (controls.keyDown(event.code, { repeat: event.repeat })) {
+      // A restart ends a lost touch (see the throttle button below).
+      if (KEY_ACTIONS[event.code] === 'restart' && !event.repeat) releaseTouches();
+      event.preventDefault();
+    }
   });
 
   windowTarget.addEventListener('keyup', (event) => {
@@ -60,10 +66,16 @@ export function bindInput({
   // moves away or is cancelled, so the throttle never stays stuck.
   //
   // A touch screen can still lose the release (a system gesture, a finger that
-  // slides off the screen edge): the throttle would then stay on, and neither
-  // Restart nor another tap would end it. Three safeguards undo that, each
-  // working on the touch fingers only, so a mouse press or a key is never
-  // released by them.
+  // slides off the screen edge): the throttle would then stay on. Three
+  // safeguards undo that, each working on the touch fingers only, so a mouse
+  // press or a key is never released by them. They act on the next touch of the
+  // screen, a touch on Restart included. A restart from the R key, or a click
+  // on Restart from a mouse or the keyboard, also ends a lost touch: the restart
+  // resets the level of the throttle, and without this a lost finger would
+  // raise it again by itself. Such a restart also ends a finger that really is
+  // on the throttle button (a touch screen with a keyboard): it has to press
+  // again. A touch on Restart leaves it alone, so that a second finger can
+  // restart while the first one holds the throttle.
   const touchPointers = new Set();
 
   function releasePointer(pointerId) {
@@ -118,6 +130,10 @@ export function bindInput({
   });
   restartButton.addEventListener('click', (event) => {
     controls.requestRestart();
+    // The click of a touch is left to the safeguards of the touch events. The
+    // type is '' when the button is activated from the keyboard, and missing in
+    // a browser that does not tell it: then nothing is released.
+    if (event.pointerType === 'mouse' || event.pointerType === '') releaseTouches();
     afterClick(restartButton)(event);
   });
 

@@ -42,10 +42,14 @@ export function createHud({ currentLap, lastLap, bestLap, laps, announcer }) {
       shown = world;
     },
 
-    /** Starts over after a restart of the race. */
-    restart(world) {
+    /**
+     * Starts over after a restart of the race, or after the circuit changed.
+     * @param {object} world The new world.
+     * @param {string} [message] What to announce.
+     */
+    restart(world, message = 'Race restarted.') {
       shown = world;
-      setText(announcer, 'Race restarted.');
+      setText(announcer, message);
       this.update(world);
     },
   };
