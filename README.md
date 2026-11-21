@@ -12,7 +12,7 @@ Hold `Space` (or the **Throttle** button on a touch screen) to accelerate and re
 
 ## The circuits
 
-There are four circuits. The car runs on the inner lane, and the length given is that of one lap. Each picture shows the car in a slide, with its tire marks behind it.
+There are five circuits. The car runs on the inner lane, and the length given is that of one lap. Each picture shows the car in a slide, with its tire marks behind it.
 
 ### Oval
 
@@ -30,13 +30,19 @@ A rounded rectangle: four corners instead of two half circles, and two short sid
 
 [![The chicane seen from above, with the yellow car sliding in the S-bend and its tire marks behind it](docs/circuit-chicane.png)](https://isghe.github.io/openslotcars/?circuit=chicane)
 
-The longest circuit, and the only one driven clockwise. An S-bend of two tight curves on the first straight, then a half turn that starts wide and tightens, a long straight and a half turn that starts tight and widens. A lap is 10.74 m long.
+The only circuit driven clockwise. An S-bend of two tight curves on the first straight, then a half turn that starts wide and tightens, a long straight and a half turn that starts tight and widens. A lap is 10.74 m long.
 
 ### Teardrop
 
 [![The teardrop seen from above, with the yellow car sliding out of the wide curve at the left end and its tire marks behind it](docs/circuit-teardrop.png)](https://isghe.github.io/openslotcars/?circuit=teardrop)
 
 A wide curve at one end and a tight hairpin at the other, joined by two straights. A lap is 5.57 m long.
+
+### Club
+
+[![The L-shaped Club circuit seen from above, with the yellow car sliding in the bottom right corner and its tire marks behind it](docs/circuit-club.png)](https://isghe.github.io/openslotcars/?circuit=club)
+
+A rounded L with a 3.2 m main straight, five left turns of different radii and a right turn in the reentrant corner. Driven counterclockwise, it is the longest circuit, with a lap of 12.70 m. Choose **Club** in the circuit menu or use `?circuit=club`.
 
 ## Run it yourself, and how it works
 

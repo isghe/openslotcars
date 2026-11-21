@@ -142,8 +142,41 @@ export const TEARDROP = Object.freeze({
   lanes: Object.freeze({ inner: 0.05, outer: -0.05 }),
 });
 
+/**
+ * A rounded L, driven counterclockwise around a 4 m by 3 m outline. Before
+ * rounding, its vertices are (0, 0), (4, 0), (4, 1.5), (1.5, 1.5),
+ * (1.5, 3) and (0, 3), translated by -2 m in x to put the finish at (0, 0).
+ * Each quarter circle trims its radius from both
+ * adjoining sides, including the right turn in the reentrant corner.
+ * The 3.2 m main straight is split equally by the finish line. Five left
+ * turns and one right turn give a net full turn; their different radii and
+ * the change of direction break up the fast main straight.
+ */
+export const CLUB = Object.freeze({
+  id: 'club',
+  name: 'Club',
+  pieces: Object.freeze([
+    straight(1.6),
+    curve(0.4, Math.PI / 2),
+    straight(0.75),
+    curve(0.35, Math.PI / 2),
+    straight(1.85),
+    curve(0.3, -Math.PI / 2),
+    straight(0.85),
+    curve(0.35, Math.PI / 2),
+    straight(0.65),
+    curve(0.5, Math.PI / 2),
+    straight(2.1),
+    curve(0.4, Math.PI / 2),
+    straight(1.6),
+  ]),
+  start: Object.freeze({ x: 0, y: 0, heading: 0 }),
+  trackWidth: 0.2,
+  lanes: Object.freeze({ inner: 0.05, outer: -0.05 }),
+});
+
 /** Every circuit of the game, in the order in which they are offered. */
-export const CIRCUITS = Object.freeze([OVAL, SPEEDWAY, CHICANE, TEARDROP]);
+export const CIRCUITS = Object.freeze([OVAL, SPEEDWAY, CHICANE, TEARDROP, CLUB]);
 
 /**
  * Finds the definition of a circuit.
