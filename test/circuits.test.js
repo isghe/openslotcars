@@ -84,9 +84,9 @@ const STRAIGHT = Math.sqrt(1.5 ** 2 - 0.3 ** 2);
 // Expected lane lengths, worked out by hand from the pieces of each circuit.
 const EXPECTED_LENGTHS = {
   'infinite-loop': { inner: 2.4 + 1.8 * Math.PI, outer: 2.4 + 1.8 * Math.PI },
-  // Polygon perimeter 14 m, minus twice the sum of the radii (3.1 m),
+  // Polygon perimeter 12.8 m, minus twice the sum of the radii (3.1 m),
   // plus the six quarter arcs. Net turning offsets each lane by 0.1 * PI m.
-  club: { inner: 7.8 + 1.45 * Math.PI, outer: 7.8 + 1.65 * Math.PI },
+  club: { inner: 6.6 + 1.45 * Math.PI, outer: 6.6 + 1.65 * Math.PI },
   oval: { inner: 4 + 0.7 * Math.PI, outer: 4 + 0.9 * Math.PI },
   speedway: { inner: 6 + 0.7 * Math.PI, outer: 6 + 0.9 * Math.PI },
   // 5.9 m of straights (0.6 + 1.2 + 3.5 + 0.6), two half turns made of two
@@ -254,6 +254,10 @@ test('the teardrop has a hairpin and a wide curve that add up to a full turn', (
 
 test('the club follows a clockwise rounded L with a left turn in its reentrant corner', () => {
   const { track, lanes } = buildCircuit(CLUB);
+  assert.deepEqual(
+    track.pieces.filter((piece) => piece.type === 'straight').map((piece) => piece.length),
+    [0.8, 0.85, 0.65, 0.7, 1.85, 0.15, 1.6],
+  );
   const corners = track.pieces.filter((piece) => piece.type === 'curve');
   const first = corners[0];
   near(first.radius, 1.2);
@@ -265,17 +269,17 @@ test('the club follows a clockwise rounded L with a left turn in its reentrant c
   near(corners[1].radius, 0.35);
   near(corners[2].radius, 0.5);
   near(corners[1].start.x, -2);
-  near(corners[1].start.y, 2.65);
+  near(corners[1].start.y, 2.05);
   near(corners[2].end.x, -0.5);
-  near(corners[2].end.y, 2.5);
+  near(corners[2].end.y, 1.9);
   assert.equal(corners.filter((piece) => piece.angle > 0).length, 1);
   assert.equal(corners.filter((piece) => piece.angle < 0).length, 5);
   near(corners.reduce((sum, piece) => sum + piece.angle, 0), -2 * Math.PI);
   const reentrant = corners.find((piece) => piece.angle > 0);
   near(reentrant.start.x, -0.5);
-  near(reentrant.start.y, 1.8);
+  near(reentrant.start.y, 1.2);
   near(reentrant.end.x, -0.2);
-  near(reentrant.end.y, 1.5);
+  near(reentrant.end.y, 0.9);
   // The inner lane of the circuit is on the outside of this left turn.
   const s = track.pieces.slice(0, 7).reduce((sum, piece) => sum + (
     piece.type === 'straight' ? piece.length
@@ -285,7 +289,7 @@ test('the club follows a clockwise rounded L with a left turn in its reentrant c
   const points = lanes.inner.sample(0.02);
   near(Math.max(...points.map((point) => point.x)), 1.95, 0.001);
   near(Math.min(...points.map((point) => point.x)), -1.95, 0.001);
-  near(Math.max(...points.map((point) => point.y)), 2.95, 0.001);
+  near(Math.max(...points.map((point) => point.y)), 2.35, 0.001);
   near(Math.min(...points.map((point) => point.y)), 0.05, 0.001);
 });
 

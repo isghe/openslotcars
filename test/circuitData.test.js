@@ -7,7 +7,17 @@ const reference = JSON.parse(await readFile(new URL('./fixtures/circuit-geometry
 const near = (a,b) => assert.ok(Math.abs(a-b) < 1e-9, `${a} != ${b}`);
 test('JSON circuits preserve the geometry captured before migration', () => {
   for (const id of Object.keys(reference)) {
-    const definition = CIRCUITS.find(circuit => circuit.id === id);
+    let definition = CIRCUITS.find(circuit => circuit.id === id);
+    // Keep the migration fixture unchanged: Club's two opposing straights
+    // were later shortened by 0.6 m each. Its current layout is checked in
+    // circuits.test.js; restore only these lengths for the historical comparison.
+    if (id === 'club') {
+      definition = { ...definition, pieces: definition.pieces.map((piece, index) => {
+        if (index === 2) return { ...piece, length: 1.45 };
+        if (index === 10) return { ...piece, length: 0.75 };
+        return piece;
+      }) };
+    }
     const {track,lanes} = buildCircuit(definition);
     const expected = reference[definition.id];
     assert.equal(track.pieces.length,expected.ends.length);
