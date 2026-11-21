@@ -16,6 +16,7 @@
 import { createLane } from '../core/geometry.js';
 import { carPose } from '../core/simulation.js';
 import { createTireMarks } from './tireMarks.js';
+import { curveBoundaries } from './curveMarkers.js';
 
 const PALETTE = Object.freeze({
   background: '#0f1216',
@@ -29,6 +30,7 @@ const PALETTE = Object.freeze({
   carWindow: '#1b2430',
   pinCore: '#000000',
   pinRing: '#ffffff',
+  curveEntry: '#65cfff',
 });
 
 // Sizes in meters. A 1:32 car is about 13 cm long.
@@ -75,15 +77,17 @@ const DIRECTION_MARK_WIDTH = 0.012;
 const DIRECTION_MARK_OPACITY = 0.85;
 const SAMPLE_SPACING = 0.02;
 const MARGIN = 0.06;
+const ENTRY_WIDTH = 0.004;
 
 /**
  * Creates a renderer for a circuit.
  * @param {HTMLCanvasElement} canvas Canvas to draw on.
  * @param {{track: object, trackWidth: number, lanes: Object<string, object>}} circuit
  * @param {object} context Simulation context (see `createContext`).
+ * @param {{curveMarkers?: boolean}} options Optional visual preview.
  * @returns {{draw: function(object): void, resize: function(): void}}
  */
-export function createRenderer(canvas, circuit, context) {
+export function createRenderer(canvas, circuit, context, { curveMarkers = false } = {}) {
   const surface = canvas.getContext('2d');
   if (surface === null) throw new Error('the canvas has no 2D drawing context');
 
@@ -92,6 +96,7 @@ export function createRenderer(canvas, circuit, context) {
   const lanePoints = Object.values(circuit.lanes).map((lane) => lane.sample(SAMPLE_SPACING));
   const finish = centerLane.poseAt(0);
   const tireMarks = createTireMarks();
+  const boundaries = curveMarkers ? curveBoundaries(circuit.track) : [];
 
   // Bounding box of the track surface, with a margin.
   const half = circuit.trackWidth / 2 + EDGE_WIDTH + MARGIN;
@@ -160,6 +165,21 @@ export function createRenderer(canvas, circuit, context) {
       }
       drawDirectionMark();
     });
+  }
+
+  function drawReferenceLines(poses, color) {
+    for (const pose of poses) {
+      withPose(pose, () => {
+        surface.strokeStyle = color;
+        surface.globalAlpha = 0.65;
+        surface.lineWidth = Math.max(1, ENTRY_WIDTH * scale);
+        surface.lineCap = 'butt';
+        surface.beginPath();
+        surface.moveTo(0, -circuit.trackWidth * scale / 2);
+        surface.lineTo(0, circuit.trackWidth * scale / 2);
+        surface.stroke();
+      });
+    }
   }
 
   /**
@@ -288,6 +308,7 @@ export function createRenderer(canvas, circuit, context) {
 
     strokePath(centerPoints, PALETTE.edge, circuit.trackWidth + 2 * EDGE_WIDTH);
     strokePath(centerPoints, PALETTE.surface, circuit.trackWidth);
+    drawReferenceLines(boundaries, PALETTE.curveEntry);
     for (const points of lanePoints) strokePath(points, PALETTE.slot, SLOT_WIDTH);
     drawFinishLine();
     // While the game is paused no step runs, so the marks stay.
