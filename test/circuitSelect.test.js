@@ -57,6 +57,7 @@ test('the menu offers every circuit, in order, with its name', () => {
       ['chicane', 'Chicane'],
       ['teardrop', 'Teardrop'],
       ['club', 'Club'],
+      ['infinite-loop', 'Infinite Loop'],
     ],
   );
 });

@@ -2,11 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createCircuitCatalog, parseCircuitDefinition, buildCircuit } from '../src/core/circuits.js';
-import { CIRCUITS, OVAL, CLUB } from './helpers/circuits.js';
+import { CIRCUITS, OVAL, CLUB, INFINITE_LOOP } from './helpers/circuits.js';
 const reference = JSON.parse(await readFile(new URL('./fixtures/circuit-geometry.json', import.meta.url), 'utf8'));
 const near = (a,b) => assert.ok(Math.abs(a-b) < 1e-9, `${a} != ${b}`);
 test('JSON circuits preserve the geometry captured before migration', () => {
-  for (const definition of CIRCUITS) {
+  for (const id of Object.keys(reference)) {
+    const definition = CIRCUITS.find(circuit => circuit.id === id);
     const {track,lanes} = buildCircuit(definition);
     const expected = reference[definition.id];
     assert.equal(track.pieces.length,expected.ends.length);
@@ -55,4 +56,14 @@ test('catalog rejects duplicate and ambiguous names including id aliases',()=>{
   assert.throws(()=>createCircuitCatalog([OVAL,OVAL]),/duplicate/);
   assert.throws(()=>createCircuitCatalog([OVAL,{...CLUB,name:'oVaL'}]),/ambiguous/);
   assert.throws(()=>createCircuitCatalog([]));
+});
+test('the zero-turn exception must be explicit and begin with a clockwise lobe', () => {
+  const raw = structuredClone(INFINITE_LOOP);
+  delete raw.topology;
+  assert.throws(()=>parseCircuitDefinition(raw), /direction rule/);
+  assert.throws(()=>parseCircuitDefinition({...OVAL, topology:'figure-eight'}), /direction rule/);
+  assert.throws(()=>parseCircuitDefinition({...OVAL, topology:'anything'}), /topology/);
+  const reversed = structuredClone(INFINITE_LOOP);
+  reversed.pieces.forEach(p=>{if(p.type==='curve')p.angle=-p.angle;});
+  assert.throws(()=>parseCircuitDefinition(reversed), /direction rule/);
 });

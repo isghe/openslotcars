@@ -12,7 +12,7 @@ Hold `Space` (or the **Throttle** button on a touch screen) to accelerate and re
 
 ## The circuits
 
-There are five circuits. The car runs on the inner lane, and the length given is that of one lap. Each picture shows the car in a slide, with its tire marks behind it.
+There are six circuits. The car runs on the lane named inner, and the length given is that of one lap. On the figure eight, each lane alternates between the inside and outside of the two lobes. Each picture shows the car in a slide, with its tire marks behind it.
 
 ### Oval
 
@@ -43,6 +43,12 @@ A wide curve at one end and a tight hairpin at the other, joined by two straight
 [![The L-shaped Club circuit seen from above, with the yellow car sliding in the top left corner and its tire marks behind it](docs/circuit-club.png)](https://isghe.github.io/openslotcars/?circuit=club)
 
 The longest circuit. A rounded L driven clockwise, with a wide first curve, five right turns of different radii and a left turn in the inside corner. A lap is 12.36 m long.
+
+### Infinite Loop
+
+[![The horizontal figure eight seen from above, with the yellow car sliding around the right lobe and its tire marks behind it](docs/circuit-infinite-loop.png)](https://isghe.github.io/openslotcars/?circuit=infinite-loop)
+
+A horizontal eight with two round lobes joined by diagonals crossing at ground level. The right lobe runs clockwise and the left counterclockwise; both lanes have the same length. A lap is 8.05 m long.
 
 ## Run it yourself, and how it works
 

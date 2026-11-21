@@ -16,7 +16,7 @@ This is a first playable prototype.
 
 **Works today**
 
-- Five circuits, chosen from a menu: an oval, a rounded rectangle (speedway), an oval with an S-bend of two long, tight curves on the first straight, two half turns, the first tightening and the second widening, and a long, fast return straight (the chicane, driven clockwise), a teardrop with a hairpin and a rounded L with a wide first curve and a left turn in its reentrant corner (Club, also driven clockwise). Each has an inner and an outer lane (the car runs on the inner one). Choosing another circuit starts a new race. The address can choose the circuit the page opens on: `?circuit=oval`, `speedway`, `chicane`, `teardrop` or `club` (the case and the spaces around the name do not matter; a missing or unknown name gives the oval). Choosing a circuit from the menu rewrites the argument in the address (the entry of the history is replaced, not added), so reloading the page or sharing the address brings the circuit back. The lap times are those of the session and are not kept between circuits or page loads.
+- Six circuits, chosen from a menu: an oval, a rounded rectangle (speedway), an oval with an S-bend of two long, tight curves on the first straight, two half turns, the first tightening and the second widening, and a long, fast return straight (the chicane, driven clockwise), a teardrop with a hairpin and a rounded L with a wide first curve and a left turn in its reentrant corner (Club, also driven clockwise), and a horizontal figure eight with a ground-level crossing. Each has an inner and an outer lane (the car runs on the inner one). Choosing another circuit starts a new race. The address can choose the circuit the page opens on: `?circuit=oval`, `speedway`, `chicane`, `teardrop`, `club` or `infinite-loop` (the case and the spaces around the name do not matter; a missing or unknown name gives the oval). Choosing a circuit from the menu rewrites the argument in the address (the entry of the history is replaced, not added), so reloading the page or sharing the address brings the circuit back. The lap times are those of the session and are not kept between circuits or page loads.
 - One car with a throttle, motor braking, friction and air drag.
 - A car with a guide pin that follows the lane and a body that pivots about it. Going too fast in a curve makes the tail slide out, which costs speed; going much too fast turns the body so far that the car leaves the track, slides a short way, and is put back on its lane after a pause. The values of the body (distances, inertia, damping, spin-out angle) are estimates for a 1:32 car, not measurements.
 - Marks that the rear tires leave on the track while the tail slides, stronger the harder the tail slides, turning from light grey to red towards the spin-out, and fading out after about four seconds.
@@ -63,7 +63,7 @@ This runs the tests with the test runner built into Node (`node --test`). They c
 
 ## How it works
 
-- **Circuit direction**: circuits whose curves all turn the same way run counterclockwise; circuits with both left and right turns run clockwise.
+- **Circuit direction**: circuits whose curves all turn the same way run counterclockwise; ordinary circuits with both left and right turns run clockwise. A figure eight explicitly declares `"topology":"figure-eight"`: its first lobe runs clockwise, the other counterclockwise, giving zero net turning and equal lane lengths.
 - **Geometry** (`src/core/geometry.js`): a circuit is a closed chain of straights and circular arcs. The position, the heading and the curvature of every lane are computed in closed form, and every lane has its own length.
 - **Physics** (`src/core/physics.js`): the motor pushes less as the car speeds up, and there are rolling friction and air drag. In a curve the car needs a lateral acceleration of `v² · curvature`. The guide pin stays on the lane and the body is a rigid bar hinged at the pin. The grip of the rear wheels is derived from the grip limit (`maxLateralAcceleration`): while it is enough, the tail rolls behind the pin, slightly inside the curve; above it the tail slides out gradually and the slide takes speed from the car. The car leaves the track only when the body has turned more than `maxSlipAngle` from the lane. All values are parameters with their units documented in the file.
 - **Simulation** (`src/core/simulation.js`, `src/core/stepper.js`): the world advances in fixed steps of 1/120 s, whatever the frame rate, so results are deterministic. The drawing is interpolated between two steps. The rule `tailSlide` turns the body model on, and it is on by default; with it off the car is a single point on the lane and leaves the track as soon as the grip limit is exceeded. The body model needs a step shorter than the pin-to-axle distance over the free speed of the car (about 1/62 s with the default parameters), and the simulation refuses a longer one.
@@ -115,6 +115,16 @@ and add independent expected lengths and geometry checks to the circuit tests.
 No JavaScript definition, build step or application server is required.
 
 ### Construction notes
+
+- **Infinite Loop:** two opposite 270 degree arcs of radius 0.60 m, joined by
+  1.2 m diagonals crossing at right angles. The circle centers lie at
+  `(+/-0.6 * sqrt(2), 0)`. The finish is 0.30 m before the crossing on the
+  northeast diagonal, at `(-0.15 * sqrt(2), -0.15 * sqrt(2))`, heading `PI/4`.
+  Both lane lengths are `2.4 + 1.8 * PI` m: the tighter radius in one lobe
+  is compensated by the wider radius in the other. The crossing is at ground
+  level, with no bridge or lane change; the guide follows its distance along
+  its own lane through each intersection. In this topology, the lane names
+  `inner` and `outer` no longer describe a globally shorter or longer route.
 
 - **Oval:** two 2 m straights and two half circles of centerline radius 0.40 m.
   The finish splits the main straight equally. Lane offsets of 0.05 m give

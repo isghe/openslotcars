@@ -13,3 +13,4 @@ export const OVAL = catalog.byId('oval');
 export const CHICANE = catalog.byId('chicane');
 export const TEARDROP = catalog.byId('teardrop');
 export const CLUB = catalog.byId('club');
+export const INFINITE_LOOP = catalog.byId('infinite-loop');
