@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { OVAL, buildCircuit } from '../src/core/circuits.js';
+import { OVAL, buildCircuit } from './helpers/circuits.js';
 import { createContext } from '../src/core/simulation.js';
 import { createControls } from '../src/core/controls.js';
 import { createGame } from '../src/core/game.js';

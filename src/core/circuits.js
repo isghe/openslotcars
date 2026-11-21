@@ -1,210 +1,86 @@
-/**
- * Circuit definitions.
- *
- * A circuit is described as plain data: the list of track pieces, the pose at
- * which the first piece starts, the width of the track and the lateral offset
- * of each lane. `buildCircuit` turns a definition into a track and its lanes.
- *
- * All distances are in meters (scale 1:32 slot car tracks) and all angles in
- * radians. The finish line sits at arc length 0 of every lane.
- *
- * This module is pure logic: no DOM, no clock, no randomness.
- */
-
+/** Pure circuit validation and geometry. Distances: meters; angles: radians. */
 import { straight, curve, createTrack, createLane } from './geometry.js';
+import { resolveNumber } from './mathConstants.js';
 
-/**
- * The oval used by the first prototype: a main straight of 2 m split in two
- * halves by the finish line, a back straight of 2 m and two half circles
- * with a center line radius of 0.40 m. The lanes are 0.10 m apart, the inner
- * one at 0.35 m and the outer one at 0.45 m from the arc centers.
- */
-export const OVAL = Object.freeze({
-  id: 'oval',
-  name: 'Oval',
-  pieces: Object.freeze([
-    straight(1),
-    curve(0.4, Math.PI),
-    straight(2),
-    curve(0.4, Math.PI),
-    straight(1),
-  ]),
-  start: Object.freeze({ x: 0, y: 0, heading: 0 }),
-  trackWidth: 0.2,
-  // Positive offsets lie to the left of the direction of travel, which is the
-  // inside of this counterclockwise oval.
-  lanes: Object.freeze({ inner: 0.05, outer: -0.05 }),
-});
-
-/**
- * A rounded rectangle: four corners with a center line radius of 0.40 m, a
- * main straight of 2 m split in two halves by the finish line, a back straight
- * of 2 m and two side straights of 1 m. The lanes are those of the oval.
- */
-export const SPEEDWAY = Object.freeze({
-  id: 'speedway',
-  name: 'Speedway',
-  pieces: Object.freeze([
-    straight(1),
-    curve(0.4, Math.PI / 2),
-    straight(1),
-    curve(0.4, Math.PI / 2),
-    straight(2),
-    curve(0.4, Math.PI / 2),
-    straight(1),
-    curve(0.4, Math.PI / 2),
-    straight(1),
-  ]),
-  start: Object.freeze({ x: 0, y: 0, heading: 0 }),
-  trackWidth: 0.2,
-  lanes: Object.freeze({ inner: 0.05, outer: -0.05 }),
-});
-
-// The chicane is driven clockwise, like Club: its curves are
-// right turns (negative angles) or, in the S-bend, a left and a right one.
-//
-// Two long curves of 135 degrees and radius 0.20 m, to the left and then to
-// the right: an S that shifts the track sideways by about 0.68 m (`S_SHIFT`)
-// and brings it back to its heading. Each curve is tighter than the half turns,
-// and long enough for the tail to slide out and the car to spin out: at a
-// constant speed the car leaves the track in the S-bend from about 2 m/s. (Two
-// curves of 45 degrees and the same radius, tried before, need about 3.4 m/s.)
-const S_BEND = [curve(0.2, (3 * Math.PI) / 4), curve(0.2, (-3 * Math.PI) / 4)];
-const S_SHIFT = 2 * 0.2 * (1 + Math.SQRT1_2);
-
-// The two half turns of the chicane are each made of two quarter circles. The
-// first one starts wide and tightens; the second one starts tight and widens.
-// The second one shifts the track sideways by 1.0 m (radii 0.35 m and 0.65 m).
-// The first one shifts it by 1.0 m plus `S_SHIFT`, which cancels the shift of
-// the S-bend: the long straight that follows leads straight to the second half
-// turn, with no second S-bend. The radii of the first half turn are 1.1 m and
-// whatever is left to make up that shift (about 0.58 m).
-const TIGHTENING = [curve(1.1, -Math.PI / 2), curve(1 + S_SHIFT - 1.1, -Math.PI / 2)];
-const WIDENING = [curve(0.35, -Math.PI / 2), curve(0.65, -Math.PI / 2)];
-
-/**
- * An oval driven clockwise, with an S-bend on the first straight (see
- * `S_BEND`), between a half turn that tightens and one that widens. The finish
- * line sits in the middle of the first straight, split in two halves of 0.6 m.
- * The return straight is 3.5 m long: that is the fast part of the circuit,
- * where the car gets close to its top speed before the tight start of the
- * second half turn. At full throttle it is at about 4 m/s at the end of it,
- * from a standstill (3.99 m/s) as well as from 3 m/s (4.17 m/s); the speed at
- * which the motor, the friction and the air drag balance is 4.44 m/s, and
- * getting within 0.01 m/s of it takes 12.7 m. The length closes the circuit:
- * the half turns end at different distances along the heading (0.3 m behind
- * for the second one, about 0.52 m ahead for the first one) and the S-bend
- * advances the track by about 0.28 m.
- */
-export const CHICANE = Object.freeze({
-  id: 'chicane',
-  name: 'Chicane',
-  pieces: Object.freeze([
-    straight(0.6),
-    ...S_BEND,
-    straight(1.2),
-    ...TIGHTENING,
-    straight(3.5),
-    ...WIDENING,
-    straight(0.6),
-  ]),
-  start: Object.freeze({ x: 0, y: 0, heading: 0 }),
-  trackWidth: 0.2,
-  // The inside of a clockwise circuit is to the right of the direction of
-  // travel, so the offsets are the opposite of those of the oval.
-  lanes: Object.freeze({ inner: -0.05, outer: 0.05 }),
-});
-
-// Teardrop: a wide curve of radius 0.60 m and a hairpin of radius 0.30 m,
-// whose centers are 1.5 m apart, joined by two straights tangent to both
-// circles. The straights are tilted by `TEARDROP_TILT` from the axis through
-// the centers, so the hairpin turns by PI - 2 * tilt and the wide curve by
-// PI + 2 * tilt.
-const TEARDROP_TILT = Math.asin((0.6 - 0.3) / 1.5);
-const TEARDROP_STRAIGHT = Math.sqrt(1.5 ** 2 - (0.6 - 0.3) ** 2);
-
-/**
- * A teardrop with a hairpin. The main straight is split in two halves by the
- * finish line, just before the hairpin.
- */
-export const TEARDROP = Object.freeze({
-  id: 'teardrop',
-  name: 'Teardrop',
-  pieces: Object.freeze([
-    straight(TEARDROP_STRAIGHT / 2),
-    curve(0.3, Math.PI - 2 * TEARDROP_TILT),
-    straight(TEARDROP_STRAIGHT),
-    curve(0.6, Math.PI + 2 * TEARDROP_TILT),
-    straight(TEARDROP_STRAIGHT / 2),
-  ]),
-  start: Object.freeze({ x: 0, y: 0, heading: 0 }),
-  trackWidth: 0.2,
-  lanes: Object.freeze({ inner: 0.05, outer: -0.05 }),
-});
-
-/**
- * A rounded L, driven clockwise around a 4 m by 3 m outline. Before
- * rounding, its vertices are (0, 0), (4, 0), (4, 1.5), (1.5, 1.5),
- * (1.5, 3) and (0, 3), translated by -2 m in x to put the finish at (0, 0).
- * Each quarter circle trims its radius from both adjoining sides, including
- * the left turn in the reentrant corner.
- * The first curve has a 1.2 m radius; the straights before and after it
- * are shortened to keep the same outline. The finish line splits the 2.4 m
- * main straight into 1.6 m before the line and 0.8 m after it. Five right
- * turns and one left turn give a net clockwise full turn; their different
- * radii and the change of direction break up the fast main straight.
- */
-export const CLUB = Object.freeze({
-  id: 'club',
-  name: 'Club',
-  pieces: Object.freeze([
-    straight(0.8),
-    curve(1.2, -Math.PI / 2),
-    straight(1.45),
-    curve(0.35, -Math.PI / 2),
-    straight(0.65),
-    curve(0.5, -Math.PI / 2),
-    straight(0.7),
-    curve(0.3, Math.PI / 2),
-    straight(1.85),
-    curve(0.35, -Math.PI / 2),
-    straight(0.75),
-    curve(0.4, -Math.PI / 2),
-    straight(1.6),
-  ]),
-  start: Object.freeze({ x: 0, y: 0, heading: Math.PI }),
-  trackWidth: 0.2,
-  lanes: Object.freeze({ inner: -0.05, outer: 0.05 }),
-});
-
-/** Every circuit of the game, in the order in which they are offered. */
-export const CIRCUITS = Object.freeze([OVAL, SPEEDWAY, CHICANE, TEARDROP, CLUB]);
-
-/**
- * Finds the definition of a circuit.
- * @param {string} id Identifier of the circuit.
- * @throws {RangeError} If no circuit has that identifier.
- */
-export function circuitById(id) {
-  const definition = CIRCUITS.find((circuit) => circuit.id === id);
-  if (definition === undefined) {
-    throw new RangeError(`unknown circuit: ${id}`);
+function fields(value, keys, path) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+    || Object.keys(value).length !== keys.length || keys.some(key => !Object.hasOwn(value, key))) {
+    throw new TypeError(`${path}: expected fields ${keys.join(', ')}`);
   }
+}
+
+/** Validates and copies JSON data into a deeply frozen definition. */
+export function parseCircuitDefinition(value, constants = {}) {
+  const finite = (number, path) => resolveNumber(number, constants, path);
+  fields(value, ['id', 'name', 'pieces', 'start', 'trackWidth', 'lanes'], 'circuit');
+  if (typeof value.id !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value.id)) throw new TypeError('id: invalid identifier');
+  const path = value.id;
+  if (typeof value.name !== 'string' || !value.name.trim() || value.name !== value.name.trim()) throw new TypeError(`${path}.name: expected a trimmed name`);
+  fields(value.start, ['x', 'y', 'heading'], `${path}.start`);
+  const start = Object.freeze(Object.fromEntries(['x', 'y', 'heading'].map(key => [key, finite(value.start[key], `${path}.start.${key}`)])));
+  const width = finite(value.trackWidth, `${path}.trackWidth`);
+  if (width <= 0) throw new RangeError(`${path}.trackWidth: must be positive`);
+  fields(value.lanes, ['inner', 'outer'], `${path}.lanes`);
+  const lanes = Object.freeze(Object.fromEntries(['inner', 'outer'].map(key => {
+    const offset = finite(value.lanes[key], `${path}.lanes.${key}`);
+    if (Math.abs(offset) >= width / 2) throw new RangeError(`${path}.lanes.${key}: outside track`);
+    return [key, offset];
+  })));
+  if (!Array.isArray(value.pieces) || !value.pieces.length) throw new TypeError(`${path}.pieces: expected a nonempty array`);
+  const pieces = Object.freeze(value.pieces.map((piece, i) => {
+    const location = `${path}.pieces[${i}]`;
+    try {
+      if (piece?.type === 'straight') {
+        fields(piece, ['type', 'length'], location);
+        return straight(finite(piece.length, `${location}.length`));
+      }
+      if (piece?.type === 'curve') {
+        fields(piece, ['type', 'radius', 'angle'], location);
+        const radius = finite(piece.radius, `${location}.radius`);
+        if (radius <= width / 2) throw new RangeError('radius must exceed half the track width');
+        return curve(radius, finite(piece.angle, `${location}.angle`));
+      }
+      throw new TypeError('unknown piece type');
+    } catch (error) { throw new TypeError(`${location}: ${error.message}`, { cause: error }); }
+  }));
+  if (pieces[0].type !== 'straight' || pieces.at(-1).type !== 'straight') throw new RangeError(`${path}.pieces: finish line must be on a straight`);
+  const turns = pieces.filter(piece => piece.type === 'curve');
+  const mixed = turns.some(piece => piece.angle > 0) && turns.some(piece => piece.angle < 0);
+  const direction = mixed ? -1 : 1;
+  if (Math.abs(turns.reduce((sum, piece) => sum + piece.angle, 0) - direction * 2 * Math.PI) > 1e-9
+    || Math.sign(lanes.inner) !== direction || Math.sign(lanes.outer) !== -direction) throw new RangeError(`${path}: violates circuit direction rule`);
+  const definition = Object.freeze({ id: value.id, name: value.name, pieces, start, trackWidth: width, lanes });
+  try {
+    const built = buildCircuit(definition);
+    if (built.lanes.inner.length >= built.lanes.outer.length) throw new RangeError('inner lane must be shorter');
+  } catch (error) { throw new RangeError(`${path}: ${error.message}`, { cause: error }); }
   return definition;
 }
 
-/**
- * Builds the track and the lanes of a circuit definition.
- * @param {{id: string, name: string, pieces: Array<object>, start: object,
- *   trackWidth: number, lanes: Object<string, number>}} definition
- * @returns {{id: string, name: string, trackWidth: number, track: object,
- *   lanes: Object<string, object>}}
- */
+/** Complete immutable catalog with synchronous lookups and no global state. */
+export function createCircuitCatalog(definitions, constants = {}) {
+  if (!Array.isArray(definitions) || !definitions.length) throw new TypeError('catalog: expected definitions');
+  const circuits = Object.freeze(definitions.map(value => parseCircuitDefinition(value, constants)));
+  const lookup = new Map();
+  const aliases = new Map();
+  for (const circuit of circuits) {
+    if (lookup.has(circuit.id)) throw new RangeError(`duplicate circuit id: ${circuit.id}`);
+    lookup.set(circuit.id, circuit);
+    for (const alias of [circuit.id, circuit.name.toLowerCase()]) {
+      if (aliases.has(alias) && aliases.get(alias) !== circuit.id) throw new RangeError(`ambiguous circuit name: ${alias}`);
+      aliases.set(alias, circuit.id);
+    }
+  }
+  return Object.freeze({ circuits, byId(id) {
+    if (!lookup.has(id)) throw new RangeError(`unknown circuit: ${id}`);
+    return lookup.get(id);
+  } });
+}
+
+/** Builds independent track and lane geometry from a definition. */
 export function buildCircuit(definition) {
   const track = createTrack([...definition.pieces], { ...definition.start });
   const lanes = {};
-  for (const [name, offset] of Object.entries(definition.lanes)) {
-    lanes[name] = createLane(track, offset);
-  }
+  for (const [name, offset] of Object.entries(definition.lanes)) lanes[name] = createLane(track, offset);
   return { id: definition.id, name: definition.name, trackWidth: definition.trackWidth, track, lanes };
 }

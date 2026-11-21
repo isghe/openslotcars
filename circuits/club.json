@@ -1,0 +1,74 @@
+{
+  "id": "club",
+  "name": "Club",
+  "pieces": [
+    {
+      "type": "straight",
+      "length": 0.8
+    },
+    {
+      "type": "curve",
+      "radius": 1.2,
+      "angle": "Math.NEG_HALF_PI"
+    },
+    {
+      "type": "straight",
+      "length": 1.45
+    },
+    {
+      "type": "curve",
+      "radius": 0.35,
+      "angle": "Math.NEG_HALF_PI"
+    },
+    {
+      "type": "straight",
+      "length": 0.65
+    },
+    {
+      "type": "curve",
+      "radius": 0.5,
+      "angle": "Math.NEG_HALF_PI"
+    },
+    {
+      "type": "straight",
+      "length": 0.7
+    },
+    {
+      "type": "curve",
+      "radius": 0.3,
+      "angle": "Math.HALF_PI"
+    },
+    {
+      "type": "straight",
+      "length": 1.85
+    },
+    {
+      "type": "curve",
+      "radius": 0.35,
+      "angle": "Math.NEG_HALF_PI"
+    },
+    {
+      "type": "straight",
+      "length": 0.75
+    },
+    {
+      "type": "curve",
+      "radius": 0.4,
+      "angle": "Math.NEG_HALF_PI"
+    },
+    {
+      "type": "straight",
+      "length": 1.6
+    }
+  ],
+  "start": {
+    "x": 0,
+    "y": 0,
+    "heading": "Math.PI"
+  },
+  "trackWidth": 0.2,
+  "lanes": {
+    "inner": -0.05,
+    "outer": 0.05
+  }
+}

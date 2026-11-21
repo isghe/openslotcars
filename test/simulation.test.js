@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { OVAL, buildCircuit } from '../src/core/circuits.js';
+import { OVAL, buildCircuit } from './helpers/circuits.js';
 import { straight, curve, createTrack, createLane } from '../src/core/geometry.js';
 import { terminalSpeed, withParams, DEFAULT_PARAMS } from '../src/core/physics.js';
 import {

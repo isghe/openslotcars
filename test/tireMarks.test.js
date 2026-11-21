@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { OVAL, buildCircuit } from '../src/core/circuits.js';
+import { OVAL, buildCircuit } from './helpers/circuits.js';
 import { DEFAULT_PARAMS, scrubDeceleration } from '../src/core/physics.js';
 import { createGame } from '../src/core/game.js';
 import { createContext, createWorld, stepWorld } from '../src/core/simulation.js';

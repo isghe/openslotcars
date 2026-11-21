@@ -20,16 +20,17 @@
         </dl>
         <p id="announcer" class="announcer" role="status" aria-live="polite"></p>
       </section>
+      <p id="loading-status" role="status">Loading circuits...</p>
       <canvas
         id="track"
         role="img"
         aria-label="Top-down view of a slot car circuit with one car on the inner lane, near the finish line."
       ></canvas>
       <section class="controls" aria-label="Controls">
-        <button id="throttle" type="button" aria-pressed="false">Throttle</button>
-        <button id="pause" type="button" aria-pressed="false">Pause</button>
-        <button id="restart" type="button">Restart</button>
-        <label class="circuit-choice">Circuit <select id="circuit"></select></label>
+        <button id="throttle" type="button" disabled aria-pressed="false">Throttle</button>
+        <button id="pause" type="button" disabled aria-pressed="false">Pause</button>
+        <button id="restart" type="button" disabled>Restart</button>
+        <label class="circuit-choice">Circuit <select id="circuit" disabled></select></label>
       </section>
       <p class="help">
         Hold <kbd>Space</kbd> or <kbd>&uarr;</kbd> to accelerate; the longer you hold,

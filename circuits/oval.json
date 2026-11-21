@@ -1,0 +1,38 @@
+{
+  "id": "oval",
+  "name": "Oval",
+  "pieces": [
+    {
+      "type": "straight",
+      "length": 1
+    },
+    {
+      "type": "curve",
+      "radius": 0.4,
+      "angle": "Math.PI"
+    },
+    {
+      "type": "straight",
+      "length": 2
+    },
+    {
+      "type": "curve",
+      "radius": 0.4,
+      "angle": "Math.PI"
+    },
+    {
+      "type": "straight",
+      "length": 1
+    }
+  ],
+  "start": {
+    "x": 0,
+    "y": 0,
+    "heading": 0
+  },
+  "trackWidth": 0.2,
+  "lanes": {
+    "inner": 0.05,
+    "outer": -0.05
+  }
+}
