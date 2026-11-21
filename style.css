@@ -41,6 +41,8 @@ main {
 
 h1 {
   margin: 0 0 12px;
+  /* Leave room for the fixed display button when the title is near the edge. */
+  padding-inline-start: clamp(0px, calc((1212px - 100vw) / 2), 56px);
   font-size: 1.5rem;
   font-weight: 600;
 }
@@ -89,6 +91,56 @@ button:focus-visible {
 button[aria-pressed="true"] {
   border-color: #ffd400;
   background: #3a3300;
+}
+
+.display-menu {
+  position: fixed;
+  z-index: 1;
+  top: 12px;
+  left: 12px;
+}
+
+#display-toggle {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  place-items: center;
+  font-size: 1.375rem;
+  line-height: 1;
+}
+
+.display-options {
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 80px);
+  margin-top: 8px;
+  padding: 4px;
+  overflow: auto;
+  border: 1px solid #aab2bd;
+  border-radius: 8px;
+  background: rgb(22 27 33 / 94%);
+}
+
+.display-options label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.display-options label:focus-within {
+  outline: 2px solid #ffd400;
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+.display-options input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex: none;
 }
 
 .circuit-choice {

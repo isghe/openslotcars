@@ -95,8 +95,7 @@ const CURB_BLOCK_LENGTH = 0.20;
  * @param {HTMLCanvasElement} canvas Canvas to draw on.
  * @param {{track: object, trackWidth: number, lanes: Object<string, object>}} circuit
  * @param {object} context Simulation context (see `createContext`).
- * @param {{curveMarkers?: boolean, curbs?: boolean}} options Optional visual previews.
- * @returns {{draw: function(object): void, resize: function(): void}}
+ * @param {{curveMarkers?: boolean, curbs?: boolean}} options Initial display options.
  */
 export function createRenderer(canvas, circuit, context, { curveMarkers = false, curbs = false } = {}) {
   const surface = canvas.getContext('2d');
@@ -110,9 +109,9 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
   const lanePoints = Object.values(circuit.lanes).map((lane) => lane.sample(SAMPLE_SPACING));
   const finish = centerLane.poseAt(0);
   const tireMarks = createTireMarks();
-  const boundaries = curveMarkers ? curveBoundaries(circuit.track) : [];
-  const midpoints = curveMarkers ? sectionMidpoints(circuit.track) : [];
-  const curbBlocks = curbs ? buildCurbBlocks() : [];
+  const boundaries = curveBoundaries(circuit.track);
+  const midpoints = sectionMidpoints(circuit.track);
+  const curbBlocks = buildCurbBlocks();
 
   /** Alternating blocks outside each curve; offsets follow its local turn. */
   function buildCurbBlocks() {
@@ -361,22 +360,33 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
     surface.fillText('Press P to resume', width / 2, height / 2 + height * 0.08);
   }
 
-  /** Builds the background and circuit once for the current size and density. */
+  /** Draws the background and circuit with the current display options. */
   function drawStatic(surface) {
     surface.fillStyle = PALETTE.background;
     surface.fillRect(0, 0, width, height);
 
-    for (const block of curbBlocks) {
-      tracePath(surface, block.points);
-      surface.fillStyle = block.red ? PALETTE.curbRed : PALETTE.curbWhite;
-      surface.fill();
+    if (curbs) {
+      for (const block of curbBlocks) {
+        tracePath(surface, block.points);
+        surface.fillStyle = block.red ? PALETTE.curbRed : PALETTE.curbWhite;
+        surface.fill();
+      }
     }
     strokePath(surface, centerPoints, PALETTE.edge, circuit.trackWidth + 2 * EDGE_WIDTH);
     strokePath(surface, centerPoints, PALETTE.surface, circuit.trackWidth);
-    drawReferenceLines(surface, boundaries, PALETTE.curveEntry);
-    drawReferenceLines(surface, midpoints, PALETTE.sectionMidpoint);
+    if (curveMarkers) {
+      drawReferenceLines(surface, boundaries, PALETTE.curveEntry);
+      drawReferenceLines(surface, midpoints, PALETTE.sectionMidpoint);
+    }
     for (const points of lanePoints) strokePath(surface, points, PALETTE.slot, SLOT_WIDTH);
     drawFinishLine(surface);
+  }
+
+  function setDisplayOptions({ curbs: showCurbs, curveMarkers: showCurveMarkers }) {
+    if (curbs === showCurbs && curveMarkers === showCurveMarkers) return;
+    curbs = showCurbs;
+    curveMarkers = showCurveMarkers;
+    drawStatic(staticSurface);
   }
 
   /**
@@ -408,5 +418,5 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
   }
 
   resize();
-  return { draw, resize };
+  return { draw, resize, setDisplayOptions };
 }

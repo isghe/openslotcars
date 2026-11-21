@@ -76,13 +76,19 @@ The logic in `src/core/` is pure: it does not touch the page, read a clock or us
 
 ## Circuit data
 
-### Curve-boundary preview
+### Circuit display options
 
-Add `&curve-markers=1` to a circuit URL to preview thin blue lines across
-the road at curve entrances and exits, for example `?circuit=club&curve-markers=1`
-or `?circuit=infinite-loop&curve-markers=1`. Without the argument, the drawing
-remains unchanged. The preview is being evaluated on Club and Infinite Loop
-before deciding whether to enable it by default for all circuits.
+Use the top-left **Display options** button to toggle **Show curbs** and
+**Show curve markers** independently. Curbs are the alternating blocks along
+the edges of the curves. Curve markers include the thin blue lines at curve
+entrances and exits and the violet midpoint lines described below. Changing
+either option updates the circuit drawing during play or while paused.
+
+The URL parameters are `curbs` and `curve-markers`, for example
+`?circuit=club&curbs=0&curve-markers=1`. Each option is on by default and
+when its parameter is exactly `1`. Any other value turns it off. When a
+parameter is repeated, its first value counts. The menu updates the current
+address so the options can be reopened or shared.
 
 Each join between arcs has one shared exit/entry line, even when both arcs
 turn the same way. This also shows changes of radius in compound corners.
