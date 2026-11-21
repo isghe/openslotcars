@@ -30,7 +30,7 @@ A rounded rectangle: four corners instead of two half circles, and two short sid
 
 [![The chicane seen from above, with the yellow car sliding in the S-bend and its tire marks behind it](docs/circuit-chicane.png)](https://isghe.github.io/openslotcars/?circuit=chicane)
 
-The only circuit driven clockwise. An S-bend of two tight curves on the first straight, then a half turn that starts wide and tightens, a long straight and a half turn that starts tight and widens. A lap is 10.74 m long.
+A circuit driven clockwise. An S-bend of two tight curves on the first straight, then a half turn that starts wide and tightens, a long straight and a half turn that starts tight and widens. A lap is 10.74 m long.
 
 ### Teardrop
 
@@ -40,9 +40,9 @@ A wide curve at one end and a tight hairpin at the other, joined by two straight
 
 ### Club
 
-[![The L-shaped Club circuit seen from above, with the yellow car sliding in the bottom right corner and its tire marks behind it](docs/circuit-club.png)](https://isghe.github.io/openslotcars/?circuit=club)
+[![The L-shaped Club circuit seen from above, with the yellow car sliding in the bottom left corner and its tire marks behind it](docs/circuit-club.png)](https://isghe.github.io/openslotcars/?circuit=club)
 
-The longest circuit. A rounded L with a long main straight, five left turns of different radii and a right turn in the inside corner. A lap is 12.70 m long.
+The longest circuit. A rounded L driven clockwise, with a long main straight, five right turns of different radii and a left turn in the inside corner. A lap is 12.70 m long.
 
 ## Run it yourself, and how it works
 

@@ -249,27 +249,40 @@ test('the teardrop has a hairpin and a wide curve that add up to a full turn', (
   assert.ok(hairpin.angle < Math.PI && wide.angle > Math.PI);
 });
 
-test('the club follows a rounded L with a right turn in its reentrant corner', () => {
+test('the club follows a clockwise rounded L with a left turn in its reentrant corner', () => {
   const { track, lanes } = buildCircuit(CLUB);
   const corners = track.pieces.filter((piece) => piece.type === 'curve');
-  assert.equal(corners.filter((piece) => piece.angle > 0).length, 5);
-  assert.equal(corners.filter((piece) => piece.angle < 0).length, 1);
-  near(corners.reduce((sum, piece) => sum + piece.angle, 0), 2 * Math.PI);
-  const reentrant = corners.find((piece) => piece.angle < 0);
-  near(reentrant.start.x, -0.2);
-  near(reentrant.start.y, 1.5);
-  near(reentrant.end.x, -0.5);
-  near(reentrant.end.y, 1.8);
-  // The inner lane of the circuit is on the outside of this right turn.
-  const s = track.pieces.slice(0, 5).reduce((sum, piece) => sum + (
-    piece.type === 'straight' ? piece.length : piece.angle * (piece.radius - 0.05)
+  assert.equal(corners.filter((piece) => piece.angle > 0).length, 1);
+  assert.equal(corners.filter((piece) => piece.angle < 0).length, 5);
+  near(corners.reduce((sum, piece) => sum + piece.angle, 0), -2 * Math.PI);
+  const reentrant = corners.find((piece) => piece.angle > 0);
+  near(reentrant.start.x, -0.5);
+  near(reentrant.start.y, 1.8);
+  near(reentrant.end.x, -0.2);
+  near(reentrant.end.y, 1.5);
+  // The inner lane of the circuit is on the outside of this left turn.
+  const s = track.pieces.slice(0, 7).reduce((sum, piece) => sum + (
+    piece.type === 'straight' ? piece.length
+      : Math.abs(piece.angle) * (piece.radius + Math.sign(piece.angle) * 0.05)
   ), 0);
-  near(lanes.inner.curvatureAt(s + 0.1), -1 / 0.35);
+  near(lanes.inner.curvatureAt(s + 0.1), 1 / 0.35);
   const points = lanes.inner.sample(0.02);
   near(Math.max(...points.map((point) => point.x)), 1.95, 0.001);
   near(Math.min(...points.map((point) => point.x)), -1.95, 0.001);
   near(Math.max(...points.map((point) => point.y)), 2.95, 0.001);
   near(Math.min(...points.map((point) => point.y)), 0.05, 0.001);
+});
+
+test('circuits with turns in both directions run clockwise, all others counterclockwise', () => {
+  for (const definition of CIRCUITS) {
+    const turns = definition.pieces.filter((piece) => piece.type === 'curve');
+    const mixed = turns.some((piece) => piece.angle > 0)
+      && turns.some((piece) => piece.angle < 0);
+    const direction = mixed ? -1 : 1;
+    near(turns.reduce((sum, piece) => sum + piece.angle, 0), direction * 2 * Math.PI);
+    assert.equal(Math.sign(definition.lanes.inner), direction, definition.id);
+    assert.equal(Math.sign(definition.lanes.outer), -direction, definition.id);
+  }
 });
 
 test('every definition is frozen at any level', () => {
