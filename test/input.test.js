@@ -65,6 +65,7 @@ function setup() {
 }
 
 const body = { tagName: 'BODY' };
+const checkbox = { tagName: 'INPUT', type: 'checkbox' };
 
 test('Space and the up arrow accelerate when the page has the focus', () => {
   const { controls, key } = setup();
@@ -98,6 +99,25 @@ test('Space on another button is left to that button', () => {
   assert.equal(controls.demanding, false);
   assert.equal(down.defaultPrevented, false);
   assert.equal(up.defaultPrevented, false);
+});
+
+test('both Space events on a checkbox are left to the checkbox', () => {
+  const { controls, key } = setup();
+  const down = key('keydown', 'Space', checkbox);
+  assert.equal(down.defaultPrevented, false);
+  assert.equal(controls.demanding, false);
+  const up = key('keyup', 'Space', checkbox);
+  assert.equal(up.defaultPrevented, false);
+  assert.equal(controls.demanding, false);
+});
+
+test('a game press released on a checkbox stops the throttle without toggling the checkbox', () => {
+  const { controls, key } = setup();
+  key('keydown', 'Space', body);
+  assert.equal(controls.demanding, true);
+  const up = key('keyup', 'Space', checkbox);
+  assert.equal(up.defaultPrevented, true);
+  assert.equal(controls.demanding, false);
 });
 
 test('releasing Space after the focus moved to another button still releases the throttle', () => {

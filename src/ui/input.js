@@ -32,18 +32,18 @@ export function bindInput({
   documentTarget = document,
 }) {
   /**
-   * Space on a focused button must activate that button, as usual; only the
+   * Space on a focused button or checkbox activates that control. The
    * throttle button hands Space over to the game.
    */
-  function leavesKeyToButton(event) {
-    return event.code === 'Space'
-      && event.target?.tagName === 'BUTTON'
-      && event.target !== throttleButton;
+  function leavesSpaceToControl({ code, target }) {
+    return code === 'Space'
+      && ((target?.tagName === 'BUTTON' && target !== throttleButton)
+        || (target?.tagName === 'INPUT' && target.type === 'checkbox'));
   }
 
   windowTarget.addEventListener('keydown', (event) => {
     if (event.ctrlKey || event.altKey || event.metaKey) return;
-    if (isTypingTarget(event.target) || leavesKeyToButton(event)) return;
+    if (isTypingTarget(event.target) || leavesSpaceToControl(event)) return;
     if (controls.keyDown(event.code, { repeat: event.repeat })) {
       // A restart ends a lost touch (see the throttle button below).
       if (KEY_ACTIONS[event.code] === 'restart' && !event.repeat) releaseTouches();
@@ -56,10 +56,10 @@ export function bindInput({
     // have started on another element, before Tab moved the focus.
     const endsGamePress = controls.isHeld(event.code);
     const isGameKey = controls.keyUp(event.code);
-    // Space on a focused button belongs to that button, unless this release
+    // Space on a focused control belongs to that control, unless this release
     // ends a press that the game started: then the browser must not also
-    // activate the button that received the focus in the meantime.
-    if (endsGamePress || (isGameKey && !leavesKeyToButton(event))) event.preventDefault();
+    // activate the control that received the focus in the meantime.
+    if (endsGamePress || (isGameKey && !leavesSpaceToControl(event))) event.preventDefault();
   });
 
   // The throttle button: a pointer pressing it counts until it is released,

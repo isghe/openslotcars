@@ -9,6 +9,15 @@
     <link rel="stylesheet" href="./style.css">
   </head>
   <body>
+    <div id="display-menu" class="display-menu">
+      <button id="display-toggle" type="button" aria-label="Display options" aria-expanded="false" aria-controls="display-options">
+        <span aria-hidden="true">☰</span>
+      </button>
+      <div id="display-options" class="display-options" hidden>
+        <label><input id="show-curbs" type="checkbox" disabled> Show curbs</label>
+        <label><input id="show-curve-markers" type="checkbox" disabled> Show curve markers</label>
+      </div>
+    </div>
     <main>
       <h1>OpenSlotCars</h1>
       <section class="timing" aria-label="Lap times">

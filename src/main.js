@@ -13,8 +13,25 @@ import { createGame } from './core/game.js';
 import { createContext } from './core/simulation.js';
 import { createHud } from './ui/hud.js';
 import { addressWithCircuit, bindCircuitSelect, circuitFromSearch } from './ui/circuitSelect.js';
+import { addressWithDisplayOption, bindDisplayMenu, displayOptionsFromSearch } from './ui/displayOptions.js';
 import { bindInput } from './ui/input.js';
 import { createRenderer } from './ui/render.js';
+
+const displayOptions = displayOptionsFromSearch(window.location.search);
+const displayCheckboxes = {
+  curbs: document.getElementById('show-curbs'),
+  curveMarkers: document.getElementById('show-curve-markers'),
+};
+for (const [option, checkbox] of Object.entries(displayCheckboxes)) {
+  checkbox.checked = displayOptions[option];
+}
+bindDisplayMenu({
+  menu: document.getElementById('display-menu'),
+  button: document.getElementById('display-toggle'),
+  panel: document.getElementById('display-options'),
+});
+
+const loadingControls = document.querySelectorAll('.controls button, .controls select, .display-options input');
 
 async function start() {
   const catalog = await loadCircuits();
@@ -45,10 +62,7 @@ async function start() {
     const circuit = buildCircuit(definition);
     const context = createContext({ lane: circuit.lanes.inner });
     game = createGame({ context, controls });
-    renderer = createRenderer(canvas, circuit, context, {
-      curveMarkers: (new URLSearchParams(window.location.search).get('curve-markers') ?? '1') === '1',
-      curbs: (new URLSearchParams(window.location.search).get('curbs') ?? '1') === '1',
-    });
+    renderer = createRenderer(canvas, circuit, context, displayOptions);
     document.title = `OpenSlotCars - ${circuit.name}`;
     canvas.setAttribute(
       'aria-label',
@@ -63,6 +77,22 @@ async function start() {
   hud.update(game.world);
   bindInput({ controls, throttleButton, pauseButton, restartButton });
   if (document.hidden) controls.setPaused(true);
+
+  for (const [option, checkbox] of Object.entries(displayCheckboxes)) {
+    checkbox.addEventListener('change', () => {
+      displayOptions[option] = checkbox.checked;
+      renderer.setDisplayOptions(displayOptions);
+      try {
+        window.history.replaceState(
+          window.history.state,
+          '',
+          addressWithDisplayOption(window.location.href, option, checkbox.checked),
+        );
+      } catch {
+        // The display options still apply if the browser refuses the address change.
+      }
+    });
+  }
 
   bindCircuitSelect({
     select: circuitSelect,
@@ -120,7 +150,7 @@ async function start() {
   new ResizeObserver(() => renderer.resize()).observe(canvas);
   requestAnimationFrame(frame);
 
-  for (const control of document.querySelectorAll('.controls button, .controls select')) control.disabled = false;
+  for (const control of loadingControls) control.disabled = false;
   document.getElementById('loading-status').textContent = '';
   document.getElementById('loading-status').hidden = true;
 }
@@ -129,5 +159,5 @@ start().catch(error => {
   console.error('Circuit loading failed:', error);
   document.getElementById('loading-status').hidden = false;
   document.getElementById('loading-status').textContent = 'Unable to load circuits. Please reload the page.';
-  for (const control of document.querySelectorAll('.controls button, .controls select')) control.disabled = true;
+  for (const control of loadingControls) control.disabled = true;
 });
