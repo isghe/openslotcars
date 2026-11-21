@@ -46,6 +46,7 @@ async function start() {
     const context = createContext({ lane: circuit.lanes.inner });
     game = createGame({ context, controls });
     renderer = createRenderer(canvas, circuit, context);
+    document.title = `OpenSlotCars - ${circuit.name}`;
     canvas.setAttribute(
       'aria-label',
       `Top-down view of the ${circuit.name} slot car circuit with one car on the inner lane, near the finish line.`,
