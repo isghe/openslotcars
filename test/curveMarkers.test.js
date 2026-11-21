@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { curveBoundaries } from '../src/ui/curveMarkers.js';
+import { curveBoundaries, sectionMidpoints } from '../src/ui/curveMarkers.js';
 import { createTrack, straight, curve } from '../src/core/geometry.js';
-import { CLUB, INFINITE_LOOP, CHICANE, buildCircuit } from './helpers/circuits.js';
+import { CLUB, INFINITE_LOOP, CHICANE, OVAL, buildCircuit } from './helpers/circuits.js';
 
 test('Club marks both ends of each curve at their exact poses', () => {
   const track = buildCircuit(CLUB).track;
@@ -14,6 +14,30 @@ test('Club marks both ends of each curve at their exact poses', () => {
   assert.deepEqual(boundaries[7], track.pieces[7].end);
 });
 
+const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);
+test('the oval has two arc midpoints and one midpoint per complete straight', () => {
+  const poses = sectionMidpoints(buildCircuit(OVAL).track);
+  assert.equal(poses.length, 4);
+  const expected = [[1.4, .4, Math.PI / 2], [0, .8, Math.PI], [-1.4, .4, 3 * Math.PI / 2], [0, 0, 0]];
+  poses.forEach((pose, i) => {
+    near(pose.x, expected[i][0]); near(pose.y, expected[i][1]);
+    // At the seam poseAt wraps to heading zero.
+    near(pose.heading, expected[i][2]);
+  });
+});
+test('the finish straight midpoint uses both unequal halves on Club', () => {
+  const poses = sectionMidpoints(buildCircuit(CLUB).track);
+  assert.equal(poses.length, 12);
+  near(poses.at(-1).x, .4); near(poses.at(-1).y, 0);
+});
+test('adjacent arcs keep their own midpoints and only straight pieces are merged', () => {
+  const track = buildCircuit(CHICANE).track;
+  assert.equal(sectionMidpoints(track).length, 9);
+  const split = createTrack([straight(.5), straight(.5), curve(.4, Math.PI), straight(2), curve(.4, Math.PI), straight(1)]);
+  const poses = sectionMidpoints(split);
+  assert.equal(poses.length, 4);
+  near(poses.at(-1).x, 0); near(poses.at(-1).y, 0);
+});
 test('Infinite Loop marks both ends of both lobes', () => {
   const track = buildCircuit(INFINITE_LOOP).track;
   assert.deepEqual(curveBoundaries(track), [

@@ -85,6 +85,9 @@ before deciding whether to enable it by default for all circuits.
 
 Each join between arcs has one shared exit/entry line, even when both arcs
 turn the same way. This also shows changes of radius in compound corners.
+Violet lines mark the midpoint of each individual arc and each continuous
+straight. Adjacent straight pieces are joined, including the two parts of
+the finish straight. A midpoint at the finish is drawn below the checkerboard.
 Each line
 lies perpendicular to travel at the boundary, derived from the existing
 geometry; it is a position reference, not a calculated braking or throttle

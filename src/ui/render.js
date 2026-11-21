@@ -16,7 +16,7 @@
 import { createLane } from '../core/geometry.js';
 import { carPose } from '../core/simulation.js';
 import { createTireMarks } from './tireMarks.js';
-import { curveBoundaries } from './curveMarkers.js';
+import { curveBoundaries, sectionMidpoints } from './curveMarkers.js';
 
 const PALETTE = Object.freeze({
   background: '#0f1216',
@@ -31,6 +31,7 @@ const PALETTE = Object.freeze({
   pinCore: '#000000',
   pinRing: '#ffffff',
   curveEntry: '#65cfff',
+  sectionMidpoint: '#d6a2ff',
 });
 
 // Sizes in meters. A 1:32 car is about 13 cm long.
@@ -97,6 +98,7 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false 
   const finish = centerLane.poseAt(0);
   const tireMarks = createTireMarks();
   const boundaries = curveMarkers ? curveBoundaries(circuit.track) : [];
+  const midpoints = curveMarkers ? sectionMidpoints(circuit.track) : [];
 
   // Bounding box of the track surface, with a margin.
   const half = circuit.trackWidth / 2 + EDGE_WIDTH + MARGIN;
@@ -309,6 +311,7 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false 
     strokePath(centerPoints, PALETTE.edge, circuit.trackWidth + 2 * EDGE_WIDTH);
     strokePath(centerPoints, PALETTE.surface, circuit.trackWidth);
     drawReferenceLines(boundaries, PALETTE.curveEntry);
+    drawReferenceLines(midpoints, PALETTE.sectionMidpoint);
     for (const points of lanePoints) strokePath(points, PALETTE.slot, SLOT_WIDTH);
     drawFinishLine();
     // While the game is paused no step runs, so the marks stay.
