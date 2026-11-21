@@ -43,6 +43,10 @@ const EDGE_WIDTH = 0.012;
 const SLOT_WIDTH = 0.006;
 const CAR_LENGTH = 0.13;
 const CAR_WIDTH = 0.06;
+// Match the tire marks' hot intensity: a sideways rear speed of 70% of
+// forward speed gives the full orange tint. Smaller slides blend from yellow.
+const CAR_HOT_SLIDE_INTENSITY = 0.7;
+const CAR_SLIDING_GREEN = 0x80;
 // The guide pin: a dark core in a light ring with a thin dark outline, so that
 // it stands out both on the yellow body and on the dark surface when the car is
 // off the track. WCAG contrast ratios of the neighbouring colors: core on ring
@@ -279,7 +283,7 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
     withPose(surface, pose, () => {
       const length = CAR_LENGTH * scale;
       const carWidth = CAR_WIDTH * scale;
-      surface.fillStyle = world.car.status === 'offTrack' ? PALETTE.carOffTrack : PALETTE.carBody;
+      surface.fillStyle = carBodyColor(world.car);
       surface.strokeStyle = PALETTE.carOutline;
       surface.lineWidth = Math.max(1.5, 0.004 * scale);
       surface.lineJoin = 'round';
@@ -292,6 +296,14 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
       surface.fillRect(length * 0.08, -carWidth * 0.35, length * 0.22, carWidth * 0.7);
       if (context.tailSlide) drawPin();
     });
+  }
+
+  function carBodyColor(car) {
+    if (car.status === 'offTrack') return PALETTE.carOffTrack;
+    if (!context.tailSlide || car.speed <= 0 || car.rearSlip === 0) return PALETTE.carBody;
+    const heat = Math.min(1, Math.abs(car.rearSlip) / car.speed / CAR_HOT_SLIDE_INTENSITY);
+    const green = Math.round(0xd4 + heat * (CAR_SLIDING_GREEN - 0xd4));
+    return `rgb(255, ${green}, 0)`;
   }
 
   /**
