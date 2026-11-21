@@ -46,7 +46,10 @@ async function start() {
     const context = createContext({ lane: circuit.lanes.inner });
     game = createGame({ context, controls });
     renderer = createRenderer(canvas, circuit, context, {
-      curveMarkers: new URLSearchParams(window.location.search).get('curve-markers') === '1',
+      // curveMarkers: new URLSearchParams(window.location.search).get('curve-markers') === '1',
+      // curbs: new URLSearchParams(window.location.search).get('curbs') === '1',
+      curveMarkers: true,
+      curbs: true
     });
     document.title = `OpenSlotCars - ${circuit.name}`;
     canvas.setAttribute(
