@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   CHICANE,
   CLUB,
+  INFINITE_LOOP,
   CIRCUITS,
   OVAL,
   TEARDROP,
@@ -82,6 +83,7 @@ const STRAIGHT = Math.sqrt(1.5 ** 2 - 0.3 ** 2);
 
 // Expected lane lengths, worked out by hand from the pieces of each circuit.
 const EXPECTED_LENGTHS = {
+  'infinite-loop': { inner: 2.4 + 1.8 * Math.PI, outer: 2.4 + 1.8 * Math.PI },
   // Polygon perimeter 14 m, minus twice the sum of the radii (3.1 m),
   // plus the six quarter arcs. Net turning offsets each lane by 0.1 * PI m.
   club: { inner: 7.8 + 1.45 * Math.PI, outer: 7.8 + 1.65 * Math.PI },
@@ -105,7 +107,7 @@ const EXPECTED_LENGTHS = {
 test('the circuits are listed in order and found by identifier', () => {
   assert.deepEqual(
     CIRCUITS.map((circuit) => circuit.id),
-    ['oval', 'speedway', 'chicane', 'teardrop', 'club'],
+    ['oval', 'speedway', 'chicane', 'teardrop', 'club', 'infinite-loop'],
   );
   assert.ok(Object.isFrozen(CIRCUITS));
   for (const circuit of CIRCUITS) assert.equal(circuitById(circuit.id), circuit);
@@ -117,7 +119,7 @@ test('every circuit has its own readable name, which the built circuit keeps', (
   const names = CIRCUITS.map((circuit) => circuit.name);
   for (const name of names) assert.ok(typeof name === 'string' && name.trim() === name && name !== '');
   assert.equal(new Set(names).size, names.length);
-  assert.deepEqual(names, ['Oval', 'Speedway', 'Chicane', 'Teardrop', 'Club']);
+  assert.deepEqual(names, ['Oval', 'Speedway', 'Chicane', 'Teardrop', 'Club', 'Infinite Loop']);
   for (const definition of CIRCUITS) {
     assert.equal(buildCircuit(definition).name, definition.name);
   }
@@ -131,7 +133,8 @@ test('every circuit closes and has the expected lane lengths', () => {
     assert.deepEqual(Object.keys(circuit.lanes), ['inner', 'outer']);
     near(circuit.lanes.inner.length, expected.inner, 1e-9, `${definition.id} inner`);
     near(circuit.lanes.outer.length, expected.outer, 1e-9, `${definition.id} outer`);
-    assert.ok(circuit.lanes.inner.length < circuit.lanes.outer.length, definition.id);
+    if (definition.topology === 'figure-eight') near(circuit.lanes.inner.length, circuit.lanes.outer.length);
+    else assert.ok(circuit.lanes.inner.length < circuit.lanes.outer.length, definition.id);
   }
 });
 
@@ -286,16 +289,40 @@ test('the club follows a clockwise rounded L with a left turn in its reentrant c
   near(Math.min(...points.map((point) => point.y)), 0.05, 0.001);
 });
 
-test('circuits with turns in both directions run clockwise, all others counterclockwise', () => {
+test('circuit direction follows the design rule, with zero net turning for the eight', () => {
   for (const definition of CIRCUITS) {
     const turns = definition.pieces.filter((piece) => piece.type === 'curve');
     const mixed = turns.some((piece) => piece.angle > 0)
       && turns.some((piece) => piece.angle < 0);
     const direction = mixed ? -1 : 1;
-    near(turns.reduce((sum, piece) => sum + piece.angle, 0), direction * 2 * Math.PI);
+    near(turns.reduce((sum, piece) => sum + piece.angle, 0), definition.topology === 'figure-eight' ? 0 : direction * 2 * Math.PI);
     assert.equal(Math.sign(definition.lanes.inner), direction, definition.id);
     assert.equal(Math.sign(definition.lanes.outer), -direction, definition.id);
   }
+});
+
+test('the horizontal eight has two opposite lobes and a perpendicular crossing', () => {
+  const { track, lanes } = buildCircuit(INFINITE_LOOP);
+  const first = track.pieces[1];
+  const second = track.pieces[3];
+  near(first.angle, -3 * Math.PI / 2);
+  near(second.angle, 3 * Math.PI / 2);
+  // Both diagonals pass through the origin; their headings differ by 90 degrees.
+  const a = track.pieces[0], b = track.pieces[2];
+  for (const [piece, distance] of [[a, 0.3], [b, 0.6]]) {
+    near(piece.start.x + distance * Math.cos(piece.start.heading), 0);
+    near(piece.start.y + distance * Math.sin(piece.start.heading), 0);
+  }
+  near(Math.abs(Math.cos(a.start.heading - b.start.heading)), 0);
+  for (const lane of Object.values(lanes)) {
+    const right = lane.curvatureAt(1);
+    const left = lane.curvatureAt(lane.length - 1);
+    assert.ok(right < 0 && left > 0);
+    near(lane.length, 2.4 + 1.8 * Math.PI);
+  }
+  const points = lanes.inner.sample(.01);
+  assert.ok(Math.max(...points.map(p=>p.x)) > 1.39);
+  assert.ok(Math.min(...points.map(p=>p.x)) < -1.49);
 });
 
 test('every definition is frozen at any level', () => {

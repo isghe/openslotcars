@@ -1,0 +1,15 @@
+{
+  "id": "infinite-loop",
+  "name": "Infinite Loop",
+  "topology": "figure-eight",
+  "pieces": [
+    { "type": "straight", "length": 0.9 },
+    { "type": "curve", "radius": 0.6, "angle": "Math.NEG_THREE_HALF_PI" },
+    { "type": "straight", "length": 1.2 },
+    { "type": "curve", "radius": 0.6, "angle": "Math.THREE_HALF_PI" },
+    { "type": "straight", "length": 0.3 }
+  ],
+  "start": { "x": -0.21213203435596423, "y": -0.21213203435596423, "heading": "Math.QUARTER_PI" },
+  "trackWidth": 0.2,
+  "lanes": { "inner": -0.05, "outer": 0.05 }
+}

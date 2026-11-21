@@ -2,9 +2,10 @@
 import { straight, curve, createTrack, createLane } from './geometry.js';
 import { resolveNumber } from './mathConstants.js';
 
-function fields(value, keys, path) {
+function fields(value, keys, path, optional = []) {
   if (!value || typeof value !== 'object' || Array.isArray(value)
-    || Object.keys(value).length !== keys.length || keys.some(key => !Object.hasOwn(value, key))) {
+    || Object.keys(value).some(key => !keys.includes(key) && !optional.includes(key))
+    || keys.some(key => !Object.hasOwn(value, key))) {
     throw new TypeError(`${path}: expected fields ${keys.join(', ')}`);
   }
 }
@@ -12,7 +13,9 @@ function fields(value, keys, path) {
 /** Validates and copies JSON data into a deeply frozen definition. */
 export function parseCircuitDefinition(value, constants = {}) {
   const finite = (number, path) => resolveNumber(number, constants, path);
-  fields(value, ['id', 'name', 'pieces', 'start', 'trackWidth', 'lanes'], 'circuit');
+  fields(value, ['id', 'name', 'pieces', 'start', 'trackWidth', 'lanes'], 'circuit', ['topology']);
+  const figureEight = value.topology === 'figure-eight';
+  if (Object.hasOwn(value, 'topology') && !figureEight) throw new TypeError('topology: expected figure-eight');
   if (typeof value.id !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value.id)) throw new TypeError('id: invalid identifier');
   const path = value.id;
   if (typeof value.name !== 'string' || !value.name.trim() || value.name !== value.name.trim()) throw new TypeError(`${path}.name: expected a trimmed name`);
@@ -47,12 +50,18 @@ export function parseCircuitDefinition(value, constants = {}) {
   const turns = pieces.filter(piece => piece.type === 'curve');
   const mixed = turns.some(piece => piece.angle > 0) && turns.some(piece => piece.angle < 0);
   const direction = mixed ? -1 : 1;
-  if (Math.abs(turns.reduce((sum, piece) => sum + piece.angle, 0) - direction * 2 * Math.PI) > 1e-9
+  const expectedTurn = figureEight ? 0 : direction * 2 * Math.PI;
+  if ((figureEight && (!mixed || turns[0]?.angle >= 0))
+    || Math.abs(turns.reduce((sum, piece) => sum + piece.angle, 0) - expectedTurn) > 1e-9
     || Math.sign(lanes.inner) !== direction || Math.sign(lanes.outer) !== -direction) throw new RangeError(`${path}: violates circuit direction rule`);
-  const definition = Object.freeze({ id: value.id, name: value.name, pieces, start, trackWidth: width, lanes });
+  const definition = Object.freeze({ id: value.id, name: value.name, pieces, start, trackWidth: width, lanes,
+    ...(figureEight ? { topology: 'figure-eight' } : {}) });
   try {
     const built = buildCircuit(definition);
-    if (built.lanes.inner.length >= built.lanes.outer.length) throw new RangeError('inner lane must be shorter');
+    const difference = built.lanes.inner.length - built.lanes.outer.length;
+    if (figureEight ? Math.abs(difference) > 1e-9 : difference >= 0) {
+      throw new RangeError(figureEight ? 'figure-eight lanes must have equal lengths' : 'inner lane must be shorter');
+    }
   } catch (error) { throw new RangeError(`${path}: ${error.message}`, { cause: error }); }
   return definition;
 }
