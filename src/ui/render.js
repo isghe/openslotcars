@@ -96,6 +96,9 @@ const CURB_BLOCK_LENGTH = 0.20;
 export function createRenderer(canvas, circuit, context, { curveMarkers = false, curbs = false } = {}) {
   const surface = canvas.getContext('2d');
   if (surface === null) throw new Error('the canvas has no 2D drawing context');
+  const staticCanvas = canvas.ownerDocument.createElement('canvas');
+  const staticSurface = staticCanvas.getContext('2d');
+  if (staticSurface === null) throw new Error('the static canvas has no 2D drawing context');
 
   const centerLane = createLane(circuit.track, 0);
   const centerPoints = centerLane.sample(SAMPLE_SPACING);
@@ -156,12 +159,13 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
   let scale = 1;
   let offsetX = 0;
   let offsetY = 0;
+  let density;
 
   function toCanvas(x, y) {
     return [offsetX + (x - bounds.minX) * scale, offsetY + (bounds.maxY - y) * scale];
   }
 
-  function tracePath(points) {
+  function tracePath(surface, points) {
     surface.beginPath();
     points.forEach((point, index) => {
       const [x, y] = toCanvas(point.x, point.y);
@@ -171,8 +175,8 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
     surface.closePath();
   }
 
-  function strokePath(points, color, lineWidth) {
-    tracePath(points);
+  function strokePath(surface, points, color, lineWidth) {
+    tracePath(surface, points);
     surface.strokeStyle = color;
     surface.lineWidth = lineWidth * scale;
     surface.lineJoin = 'round';
@@ -180,7 +184,7 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
   }
 
   /** Places the origin on a pose, with the x axis along the heading. */
-  function withPose(pose, drawLocal) {
+  function withPose(surface, pose, drawLocal) {
     const [x, y] = toCanvas(pose.x, pose.y);
     surface.save();
     surface.translate(x, y);
@@ -191,9 +195,9 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
     surface.restore();
   }
 
-  function drawFinishLine() {
+  function drawFinishLine(surface) {
     const cell = circuit.trackWidth / CHECKER_CELLS;
-    withPose(finish, () => {
+    withPose(surface, finish, () => {
       for (let row = 0; row < 2; row += 1) {
         for (let column = 0; column < CHECKER_CELLS; column += 1) {
           surface.fillStyle = (row + column) % 2 === 0 ? PALETTE.checkerLight : PALETTE.checkerDark;
@@ -205,13 +209,13 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
           );
         }
       }
-      drawDirectionMark();
+      drawDirectionMark(surface);
     });
   }
 
-  function drawReferenceLines(poses, color) {
+  function drawReferenceLines(surface, poses, color) {
     for (const pose of poses) {
-      withPose(pose, () => {
+      withPose(surface, pose, () => {
         surface.strokeStyle = color;
         surface.globalAlpha = 0.65;
         surface.lineWidth = Math.max(1, ENTRY_WIDTH * scale);
@@ -230,7 +234,7 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
    * it does not hide the mark. In the frame of the pose, with the x axis along
    * the heading.
    */
-  function drawDirectionMark() {
+  function drawDirectionMark(surface) {
     surface.save();
     surface.globalAlpha = DIRECTION_MARK_OPACITY;
     surface.strokeStyle = PALETTE.checkerLight;
@@ -271,12 +275,13 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
 
   function drawCar(world) {
     const pose = carPose(world, context);
-    withPose(pose, () => {
+    withPose(surface, pose, () => {
       const length = CAR_LENGTH * scale;
       const carWidth = CAR_WIDTH * scale;
       surface.fillStyle = PALETTE.carBody;
       surface.strokeStyle = PALETTE.carOutline;
       surface.lineWidth = Math.max(1.5, 0.004 * scale);
+      surface.lineJoin = 'round';
       surface.beginPath();
       surface.rect(-length / 2, -carWidth / 2, length, carWidth);
       surface.fill();
@@ -308,18 +313,27 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
 
   /** Fits the canvas to its displayed size and to the screen density. */
   function resize() {
-    const density = globalThis.devicePixelRatio || 1;
-    width = canvas.clientWidth;
-    height = canvas.clientHeight;
-    canvas.width = Math.max(1, Math.round(width * density));
-    canvas.height = Math.max(1, Math.round(height * density));
+    const nextDensity = globalThis.devicePixelRatio || 1;
+    const nextWidth = canvas.clientWidth;
+    const nextHeight = canvas.clientHeight;
+    const pixelWidth = Math.max(1, Math.round(nextWidth * nextDensity));
+    const pixelHeight = Math.max(1, Math.round(nextHeight * nextDensity));
+    if (width === nextWidth && height === nextHeight && density === nextDensity
+        && canvas.width === pixelWidth && canvas.height === pixelHeight) return;
+    density = nextDensity;
+    width = nextWidth;
+    height = nextHeight;
+    canvas.width = staticCanvas.width = pixelWidth;
+    canvas.height = staticCanvas.height = pixelHeight;
     surface.setTransform(density, 0, 0, density, 0, 0);
+    staticSurface.setTransform(density, 0, 0, density, 0, 0);
 
     const boundsWidth = bounds.maxX - bounds.minX;
     const boundsHeight = bounds.maxY - bounds.minY;
     scale = Math.min(width / boundsWidth, height / boundsHeight);
     offsetX = (width - boundsWidth * scale) / 2;
     offsetY = (height - boundsHeight * scale) / 2;
+    drawStatic(staticSurface);
   }
 
   function drawPauseOverlay() {
@@ -334,6 +348,24 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
     surface.fillText('Press P to resume', width / 2, height / 2 + height * 0.08);
   }
 
+  /** Builds the background and circuit once for the current size and density. */
+  function drawStatic(surface) {
+    surface.fillStyle = PALETTE.background;
+    surface.fillRect(0, 0, width, height);
+
+    for (const block of curbBlocks) {
+      tracePath(surface, block.points);
+      surface.fillStyle = block.red ? PALETTE.curbRed : PALETTE.curbWhite;
+      surface.fill();
+    }
+    strokePath(surface, centerPoints, PALETTE.edge, circuit.trackWidth + 2 * EDGE_WIDTH);
+    strokePath(surface, centerPoints, PALETTE.surface, circuit.trackWidth);
+    drawReferenceLines(surface, boundaries, PALETTE.curveEntry);
+    drawReferenceLines(surface, midpoints, PALETTE.sectionMidpoint);
+    for (const points of lanePoints) strokePath(surface, points, PALETTE.slot, SLOT_WIDTH);
+    drawFinishLine(surface);
+  }
+
   /**
    * Draws the circuit and the car of the given world.
    * @param {object} world World to draw.
@@ -345,20 +377,15 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
    *   the marks of the race before are forgotten.
    */
   function draw(world, { paused = false, steps = [world], restarted = false } = {}) {
-    surface.fillStyle = PALETTE.background;
-    surface.fillRect(0, 0, width, height);
-
-    for (const block of curbBlocks) {
-      tracePath(block.points);
-      surface.fillStyle = block.red ? PALETTE.curbRed : PALETTE.curbWhite;
-      surface.fill();
-    }
-    strokePath(centerPoints, PALETTE.edge, circuit.trackWidth + 2 * EDGE_WIDTH);
-    strokePath(centerPoints, PALETTE.surface, circuit.trackWidth);
-    drawReferenceLines(boundaries, PALETTE.curveEntry);
-    drawReferenceLines(midpoints, PALETTE.sectionMidpoint);
-    for (const points of lanePoints) strokePath(points, PALETTE.slot, SLOT_WIDTH);
-    drawFinishLine();
+    // Page zoom can change density without changing the canvas's CSS size.
+    if ((globalThis.devicePixelRatio || 1) !== density) resize();
+    surface.save();
+    surface.setTransform(1, 0, 0, 1, 0, 0);
+    surface.globalAlpha = 1;
+    surface.globalCompositeOperation = 'copy';
+    // Copy native pixels, including any fractional coverage at rounded edges.
+    surface.drawImage(staticCanvas, 0, 0);
+    surface.restore();
     // While the game is paused no step runs, so the marks stay.
     if (restarted) tireMarks.reset();
     for (const step of steps) tireMarks.record(step, context);
