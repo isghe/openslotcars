@@ -26,6 +26,7 @@ const PALETTE = Object.freeze({
   checkerLight: '#ffffff',
   checkerDark: '#000000',
   carBody: '#ffd400',
+  carOffTrack: '#ff0000',
   carOutline: '#000000',
   carWindow: '#1b2430',
   pinCore: '#000000',
@@ -278,7 +279,7 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
     withPose(surface, pose, () => {
       const length = CAR_LENGTH * scale;
       const carWidth = CAR_WIDTH * scale;
-      surface.fillStyle = PALETTE.carBody;
+      surface.fillStyle = world.car.status === 'offTrack' ? PALETTE.carOffTrack : PALETTE.carBody;
       surface.strokeStyle = PALETTE.carOutline;
       surface.lineWidth = Math.max(1.5, 0.004 * scale);
       surface.lineJoin = 'round';
