@@ -1,5 +1,6 @@
 /** Pure circuit validation and geometry. Distances: meters; angles: radians. */
 import { straight, curve, createTrack, createLane } from './geometry.js';
+import { resolveNumber } from './mathConstants.js';
 
 function fields(value, keys, path) {
   if (!value || typeof value !== 'object' || Array.isArray(value)
@@ -7,13 +8,10 @@ function fields(value, keys, path) {
     throw new TypeError(`${path}: expected fields ${keys.join(', ')}`);
   }
 }
-function finite(value, path) {
-  if (!Number.isFinite(value)) throw new TypeError(`${path}: expected a finite number`);
-  return value;
-}
 
 /** Validates and copies JSON data into a deeply frozen definition. */
-export function parseCircuitDefinition(value) {
+export function parseCircuitDefinition(value, constants = {}) {
+  const finite = (number, path) => resolveNumber(number, constants, path);
   fields(value, ['id', 'name', 'pieces', 'start', 'trackWidth', 'lanes'], 'circuit');
   if (typeof value.id !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value.id)) throw new TypeError('id: invalid identifier');
   const path = value.id;
@@ -34,12 +32,13 @@ export function parseCircuitDefinition(value) {
     try {
       if (piece?.type === 'straight') {
         fields(piece, ['type', 'length'], location);
-        return straight(piece.length);
+        return straight(finite(piece.length, `${location}.length`));
       }
       if (piece?.type === 'curve') {
         fields(piece, ['type', 'radius', 'angle'], location);
-        if (piece.radius <= width / 2) throw new RangeError('radius must exceed half the track width');
-        return curve(piece.radius, piece.angle);
+        const radius = finite(piece.radius, `${location}.radius`);
+        if (radius <= width / 2) throw new RangeError('radius must exceed half the track width');
+        return curve(radius, finite(piece.angle, `${location}.angle`));
       }
       throw new TypeError('unknown piece type');
     } catch (error) { throw new TypeError(`${location}: ${error.message}`, { cause: error }); }
@@ -59,9 +58,9 @@ export function parseCircuitDefinition(value) {
 }
 
 /** Complete immutable catalog with synchronous lookups and no global state. */
-export function createCircuitCatalog(definitions) {
+export function createCircuitCatalog(definitions, constants = {}) {
   if (!Array.isArray(definitions) || !definitions.length) throw new TypeError('catalog: expected definitions');
-  const circuits = Object.freeze(definitions.map(parseCircuitDefinition));
+  const circuits = Object.freeze(definitions.map(value => parseCircuitDefinition(value, constants)));
   const lookup = new Map();
   const aliases = new Map();
   for (const circuit of circuits) {

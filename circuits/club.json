@@ -9,7 +9,7 @@
     {
       "type": "curve",
       "radius": 1.2,
-      "angle": -1.5707963267948966
+      "angle": "Math.NEG_HALF_PI"
     },
     {
       "type": "straight",
@@ -18,7 +18,7 @@
     {
       "type": "curve",
       "radius": 0.35,
-      "angle": -1.5707963267948966
+      "angle": "Math.NEG_HALF_PI"
     },
     {
       "type": "straight",
@@ -27,7 +27,7 @@
     {
       "type": "curve",
       "radius": 0.5,
-      "angle": -1.5707963267948966
+      "angle": "Math.NEG_HALF_PI"
     },
     {
       "type": "straight",
@@ -36,7 +36,7 @@
     {
       "type": "curve",
       "radius": 0.3,
-      "angle": 1.5707963267948966
+      "angle": "Math.HALF_PI"
     },
     {
       "type": "straight",
@@ -45,7 +45,7 @@
     {
       "type": "curve",
       "radius": 0.35,
-      "angle": -1.5707963267948966
+      "angle": "Math.NEG_HALF_PI"
     },
     {
       "type": "straight",
@@ -54,7 +54,7 @@
     {
       "type": "curve",
       "radius": 0.4,
-      "angle": -1.5707963267948966
+      "angle": "Math.NEG_HALF_PI"
     },
     {
       "type": "straight",
@@ -64,7 +64,7 @@
   "start": {
     "x": 0,
     "y": 0,
-    "heading": 3.141592653589793
+    "heading": "Math.PI"
   },
   "trackWidth": 0.2,
   "lanes": {

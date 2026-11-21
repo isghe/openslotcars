@@ -9,7 +9,7 @@
     {
       "type": "curve",
       "radius": 0.4,
-      "angle": 1.5707963267948966
+      "angle": "Math.HALF_PI"
     },
     {
       "type": "straight",
@@ -18,7 +18,7 @@
     {
       "type": "curve",
       "radius": 0.4,
-      "angle": 1.5707963267948966
+      "angle": "Math.HALF_PI"
     },
     {
       "type": "straight",
@@ -27,7 +27,7 @@
     {
       "type": "curve",
       "radius": 0.4,
-      "angle": 1.5707963267948966
+      "angle": "Math.HALF_PI"
     },
     {
       "type": "straight",
@@ -36,7 +36,7 @@
     {
       "type": "curve",
       "radius": 0.4,
-      "angle": 1.5707963267948966
+      "angle": "Math.HALF_PI"
     },
     {
       "type": "straight",

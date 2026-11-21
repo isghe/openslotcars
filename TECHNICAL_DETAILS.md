@@ -83,8 +83,17 @@ radians. Positive curve angles turn left; positive lane offsets lie to the left
 of travel. A straight is `{"type":"straight","length":1}`; an arc is
 `{"type":"curve","radius":0.4,"angle":3.141592653589793}`.
 
-The files contain numbers, not expressions. Preserve full numeric precision
-when calculating angles or tangent lengths: the track must close in position
+Numeric fields accept numbers or exact references such as `"Math.HALF_PI"`.
+`circuits/math.json` defines the constants as uppercase names with finite
+numeric values, for example `{"PI":3.141592653589793}`. `Math` is a reference
+prefix, not the JavaScript object: expressions such as `"Math.PI / 2"` are
+rejected. Negative angles use explicit names such as `"Math.NEG_HALF_PI"`.
+The constants file is separate from the ordered circuit index and is loaded
+once with it. Unknown names, nonnumeric constants and invalid files stop
+startup with the same error handling as invalid circuit data.
+
+Preserve full numeric precision when calculating angles or tangent lengths:
+the track must close in position
 and heading within `1e-9`. The first and last pieces must be straights so that
 the finish line lies on a straight. Definitions are validated and copied into
 deeply frozen objects; invalid geometry, inconsistent directions, ambiguous
@@ -100,7 +109,8 @@ startup uses the loaded catalog without more requests.
 
 To add a circuit, create its JSON file and list the filename in `index.json`.
 The filename must match the lowercase identifier, for example `club.json` for
-`club`. Keep identifiers and names unambiguous, follow the direction rule above,
+`club`. The names `index` and `math` are reserved. Keep identifiers and names
+unambiguous, follow the direction rule above,
 and add independent expected lengths and geometry checks to the circuit tests.
 No JavaScript definition, build step or application server is required.
 

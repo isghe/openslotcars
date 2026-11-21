@@ -9,7 +9,7 @@
     {
       "type": "curve",
       "radius": 0.4,
-      "angle": 3.141592653589793
+      "angle": "Math.PI"
     },
     {
       "type": "straight",
@@ -18,7 +18,7 @@
     {
       "type": "curve",
       "radius": 0.4,
-      "angle": 3.141592653589793
+      "angle": "Math.PI"
     },
     {
       "type": "straight",
