@@ -60,7 +60,7 @@ export const SPEEDWAY = Object.freeze({
   lanes: Object.freeze({ inner: 0.05, outer: -0.05 }),
 });
 
-// The chicane is driven clockwise, unlike the other circuits: its curves are
+// The chicane is driven clockwise, like Club: its curves are
 // right turns (negative angles) or, in the S-bend, a left and a right one.
 //
 // Two long curves of 135 degrees and radius 0.20 m, to the left and then to
@@ -142,8 +142,43 @@ export const TEARDROP = Object.freeze({
   lanes: Object.freeze({ inner: 0.05, outer: -0.05 }),
 });
 
+/**
+ * A rounded L, driven clockwise around a 4 m by 3 m outline. Before
+ * rounding, its vertices are (0, 0), (4, 0), (4, 1.5), (1.5, 1.5),
+ * (1.5, 3) and (0, 3), translated by -2 m in x to put the finish at (0, 0).
+ * Each quarter circle trims its radius from both adjoining sides, including
+ * the left turn in the reentrant corner.
+ * The first curve has a 1.2 m radius; the straights before and after it
+ * are shortened to keep the same outline. The finish line splits the 2.4 m
+ * main straight into 1.6 m before the line and 0.8 m after it. Five right
+ * turns and one left turn give a net clockwise full turn; their different
+ * radii and the change of direction break up the fast main straight.
+ */
+export const CLUB = Object.freeze({
+  id: 'club',
+  name: 'Club',
+  pieces: Object.freeze([
+    straight(0.8),
+    curve(1.2, -Math.PI / 2),
+    straight(1.45),
+    curve(0.35, -Math.PI / 2),
+    straight(0.65),
+    curve(0.5, -Math.PI / 2),
+    straight(0.7),
+    curve(0.3, Math.PI / 2),
+    straight(1.85),
+    curve(0.35, -Math.PI / 2),
+    straight(0.75),
+    curve(0.4, -Math.PI / 2),
+    straight(1.6),
+  ]),
+  start: Object.freeze({ x: 0, y: 0, heading: Math.PI }),
+  trackWidth: 0.2,
+  lanes: Object.freeze({ inner: -0.05, outer: 0.05 }),
+});
+
 /** Every circuit of the game, in the order in which they are offered. */
-export const CIRCUITS = Object.freeze([OVAL, SPEEDWAY, CHICANE, TEARDROP]);
+export const CIRCUITS = Object.freeze([OVAL, SPEEDWAY, CHICANE, TEARDROP, CLUB]);
 
 /**
  * Finds the definition of a circuit.
