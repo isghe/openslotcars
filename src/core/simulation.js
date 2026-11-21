@@ -36,6 +36,7 @@ import {
   stepLongitudinal,
   hasLostGrip,
   stepOffTrack,
+  stepOffTrackRotation,
   stepYaw,
   hasSpunOut,
   scrubDeceleration,
@@ -62,7 +63,7 @@ export const DEFAULT_RULES = Object.freeze({
   tailSlide: true,
 });
 
-/** Visual spin of a sliding car, in radians per meter slid. Not physical. */
+/** Visual spin for the point model without a sliding body, in rad/m. */
 export const SLIDE_SPIN = 3;
 
 /**
@@ -116,8 +117,8 @@ export function createContext({ lane, params = DEFAULT_PARAMS, rules = {} }) {
  * and the car also has `slip` (angle of the body to the lane, rad, positive
  * with the nose to the left), `yawRate` (rotation speed of the body, rad/s) and
  * `rearSlip` (sideways speed of the rear axle, m/s, zero while the tail holds),
- * as `stepYaw` defines them. Off the track it keeps only `slip`, the angle at
- * which it spun out.
+ * as `stepYaw` defines them. Off the track it keeps `slip`, the angle at
+ * which it spun out, and `yawRate`, and accumulates `rotation` from that angle.
  */
 export function createWorld(context) {
   const aligned = context.tailSlide ? { slip: 0, yawRate: 0, rearSlip: 0 } : {};
@@ -184,7 +185,7 @@ export function stepWorld(world, input, context) {
           speed: next.speed,
           travel: 0,
           resumeStep: stepIndex + context.recoverySteps,
-          ...(body && { slip: body.slip }),
+          ...(body && { slip: body.slip, yawRate: body.yawRate, rotation: 0 }),
         },
       };
     }
@@ -206,25 +207,27 @@ export function stepWorld(world, input, context) {
     };
   }
   const slid = stepOffTrack({ travel: car.travel, speed: car.speed }, dt, params);
+  const rotation = context.tailSlide ? stepOffTrackRotation({ ...car, speed: slid.speed }, dt, params) : {};
   return {
     stepIndex,
     time,
     timer: world.timer,
-    car: { ...car, travel: slid.travel, speed: slid.speed },
+    car: { ...car, travel: slid.travel, speed: slid.speed, ...rotation },
   };
 }
 
 /**
  * Pose of the car in the plane, for drawing. On the track it is the pose on
  * the lane; off the track the car continues along the tangent at the exit
- * point and spins visually.
+ * point. With a sliding body its rotation follows the angular velocity at
+ * release, slowed by friction; the point model uses a visual spin instead.
  *
  * With the rule `tailSlide` the pose is that of the center of the body, and its
  * heading is the heading of the body, which is the one of the lane plus `slip`.
  * The guide pin is on the lane, in front of the center by `pinToCenterOfMass`
  * along the heading. Off the track the center slides along the tangent of the
  * lane at the exit point, from where the body was, and the body keeps turning
- * the way it was turning, which is the sign of `slip`.
+ * with its accumulated off-track `rotation`, about its center of mass.
  * @returns {{x: number, y: number, heading: number}}
  */
 export function carPose(world, context) {
@@ -244,12 +247,10 @@ export function carPose(world, context) {
   const x = pose.x - back * Math.cos(heading);
   const y = pose.y - back * Math.sin(heading);
   if (car.status === 'onTrack') return { x, y, heading };
-  // Off the track `slip` is beyond the spin-out angle, so its sign is defined.
-  const turning = Math.sign(car.slip);
   return {
     x: x + car.travel * Math.cos(pose.heading),
     y: y + car.travel * Math.sin(pose.heading),
-    heading: heading + turning * SLIDE_SPIN * car.travel,
+    heading: heading + car.rotation,
   };
 }
 
@@ -284,5 +285,8 @@ export function interpolateWorld(previous, current, alpha) {
   }
   if (before.distance !== after.distance) return current;
   const travel = before.travel + (after.travel - before.travel) * alpha;
-  return { ...current, car: { ...after, travel } };
+  const rotation = 'rotation' in before && 'rotation' in after
+    ? { rotation: before.rotation + (after.rotation - before.rotation) * alpha }
+    : {};
+  return { ...current, car: { ...after, travel, ...rotation } };
 }

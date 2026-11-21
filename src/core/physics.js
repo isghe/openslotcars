@@ -47,6 +47,11 @@
  * - `offTrackDeceleration`: deceleration of a car that left the track, m/s^2.
  *   It is much higher than plain sliding friction because the car bounces and
  *   tumbles: from the top speed it stops after about half a meter.
+ * - `offTrackFrictionTorque`: torque opposing off-track rotation at rest,
+ *   per unit of mass, m^2/s^2. An estimate; it decreases with sliding speed.
+ *   Dividing it by `bodyRadiusOfGyration` squared gives angular deceleration.
+ * - `offTrackRotationSpeed`: sliding speed at which the rotational friction
+ *   torque is half its stationary value, m/s. A visual calibration estimate.
  *
  * The values below are estimates for a 1:32 car, not measurements:
  *
@@ -71,6 +76,8 @@ export const DEFAULT_PARAMS = Object.freeze({
   airDrag: 0.02,
   maxLateralAcceleration: 12,
   offTrackDeceleration: 20,
+  offTrackFrictionTorque: 0.32,
+  offTrackRotationSpeed: 1,
   pinToCenterOfMass: 0.04,
   pinToRearAxle: 0.08,
   bodyRadiusOfGyration: 0.041,
@@ -214,6 +221,38 @@ export function stepOffTrack(state, dt, params = DEFAULT_PARAMS) {
   }
   const speed = Math.max(0, state.speed - params.offTrackDeceleration * dt);
   return { travel: state.travel + speed * dt, speed };
+}
+
+/**
+ * Free body rotation after the guide leaves the slot. `rotation` is the angle
+ * accumulated since the exit (rad), `yawRate` the signed angular speed (rad/s).
+ * `speed` is the sliding speed in m/s. The friction torque is strongest near
+ * rest and decreases as 1 / (1 + speed / offTrackRotationSpeed), so a car
+ * settles quickly when translation stops. This is an approximate damping
+ * model, not a tire contact simulation. Speed is held constant within this
+ * rotation step; integrate only until the angular stop, without reversing.
+ * At zero sliding speed rotation stops too: this gameplay approximation
+ * prevents a stationary car from continuing to spin in place.
+ * Inertia per unit mass is kG^2 about the center of mass; the guide no longer
+ * supplies a pivot.
+ */
+export function stepOffTrackRotation(state, dt, params = DEFAULT_PARAMS) {
+  if (!Number.isFinite(dt) || dt <= 0) {
+    throw new RangeError(`dt must be a positive finite number, got ${dt}`);
+  }
+  const rotation = checkFinite('rotation', state.rotation);
+  const yawRate = checkFinite('yawRate', state.yawRate);
+  const speed = checkFinite('speed', state.speed);
+  if (speed < 0) throw new RangeError(`speed must not be negative, got ${speed}`);
+  if (speed === 0) return { rotation, yawRate: 0 };
+  const torque = params.offTrackFrictionTorque / (1 + speed / params.offTrackRotationSpeed);
+  const deceleration = torque / params.bodyRadiusOfGyration ** 2;
+  const duration = deceleration === 0 ? dt : Math.min(dt, Math.abs(yawRate) / deceleration);
+  const sign = Math.sign(yawRate);
+  return {
+    rotation: rotation + yawRate * duration - sign * deceleration * duration ** 2 / 2,
+    yawRate: sign * Math.max(0, Math.abs(yawRate) - deceleration * dt) || 0,
+  };
 }
 
 function checkFinite(name, value) {
