@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createContext, createWorld } from '../src/core/simulation.js';
-import { buildCircuit, OVAL } from '../src/core/circuits.js';
+import { buildCircuit, OVAL } from './helpers/circuits.js';
 import { createHud } from '../src/ui/hud.js';
 
 function setup() {

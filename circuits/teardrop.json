@@ -1,0 +1,38 @@
+{
+  "id": "teardrop",
+  "name": "Teardrop",
+  "pieces": [
+    {
+      "type": "straight",
+      "length": 0.7348469228349535
+    },
+    {
+      "type": "curve",
+      "radius": 0.3,
+      "angle": 2.7388768120091314
+    },
+    {
+      "type": "straight",
+      "length": 1.469693845669907
+    },
+    {
+      "type": "curve",
+      "radius": 0.6,
+      "angle": 3.544308495170455
+    },
+    {
+      "type": "straight",
+      "length": 0.7348469228349535
+    }
+  ],
+  "start": {
+    "x": 0,
+    "y": 0,
+    "heading": 0
+  },
+  "trackWidth": 0.2,
+  "lanes": {
+    "inner": 0.05,
+    "outer": -0.05
+  }
+}

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CIRCUITS, OVAL } from '../src/core/circuits.js';
+import { CIRCUITS, OVAL } from './helpers/circuits.js';
 import { addressWithCircuit, bindCircuitSelect, circuitFromSearch } from '../src/ui/circuitSelect.js';
 
 /** Minimal stand-in for the menu: it records listeners, options and blurs. */

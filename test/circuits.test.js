@@ -8,7 +8,7 @@ import {
   TEARDROP,
   buildCircuit,
   circuitById,
-} from '../src/core/circuits.js';
+} from './helpers/circuits.js';
 
 const EPSILON = 1e-9;
 

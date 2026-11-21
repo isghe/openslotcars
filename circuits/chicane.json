@@ -1,0 +1,62 @@
+{
+  "id": "chicane",
+  "name": "Chicane",
+  "pieces": [
+    {
+      "type": "straight",
+      "length": 0.6
+    },
+    {
+      "type": "curve",
+      "radius": 0.2,
+      "angle": 2.356194490192345
+    },
+    {
+      "type": "curve",
+      "radius": 0.2,
+      "angle": -2.356194490192345
+    },
+    {
+      "type": "straight",
+      "length": 1.2
+    },
+    {
+      "type": "curve",
+      "radius": 1.1,
+      "angle": -1.5707963267948966
+    },
+    {
+      "type": "curve",
+      "radius": 0.5828427124746189,
+      "angle": -1.5707963267948966
+    },
+    {
+      "type": "straight",
+      "length": 3.5
+    },
+    {
+      "type": "curve",
+      "radius": 0.35,
+      "angle": -1.5707963267948966
+    },
+    {
+      "type": "curve",
+      "radius": 0.65,
+      "angle": -1.5707963267948966
+    },
+    {
+      "type": "straight",
+      "length": 0.6
+    }
+  ],
+  "start": {
+    "x": 0,
+    "y": 0,
+    "heading": 0
+  },
+  "trackWidth": 0.2,
+  "lanes": {
+    "inner": -0.05,
+    "outer": 0.05
+  }
+}

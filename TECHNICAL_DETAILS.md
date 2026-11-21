@@ -73,11 +73,80 @@ This runs the tests with the test runner built into Node (`node --test`). They c
 
 The logic in `src/core/` is pure: it does not touch the page, read a clock or use random numbers, so it also runs in Node.
 
+## Circuit data
+
+Each circuit is defined in `circuits/<id>.json`. The ordered filename list in
+`circuits/index.json` supplies the menu order. The data fields are `id`, `name`,
+`pieces`, `start` (`x`, `y`, `heading`), `trackWidth` and `lanes` (`inner`, `outer`).
+Distances are in meters and all angles, including the starting heading, are in
+radians. Positive curve angles turn left; positive lane offsets lie to the left
+of travel. A straight is `{"type":"straight","length":1}`; an arc is
+`{"type":"curve","radius":0.4,"angle":3.141592653589793}`.
+
+The files contain numbers, not expressions. Preserve full numeric precision
+when calculating angles or tangent lengths: the track must close in position
+and heading within `1e-9`. The first and last pieces must be straights so that
+the finish line lies on a straight. Definitions are validated and copied into
+deeply frozen objects; invalid geometry, inconsistent directions, ambiguous
+names and incompatible lane offsets are rejected rather than corrected.
+
+`src/data/loadCircuits.js` fetches the index and all its circuits once at startup.
+URLs are relative to that module, so the same files work at the site root or
+under `/openslotcars/`. The game starts only after the whole catalog is valid.
+Controls remain disabled while loading; a failed request or invalid file shows
+an error and leaves the game stopped. An unknown `?circuit=` value still selects
+Oval; it does not cause another file to be fetched. Changing circuits after
+startup uses the loaded catalog without more requests.
+
+To add a circuit, create its JSON file and list the filename in `index.json`.
+The filename must match the lowercase identifier, for example `club.json` for
+`club`. Keep identifiers and names unambiguous, follow the direction rule above,
+and add independent expected lengths and geometry checks to the circuit tests.
+No JavaScript definition, build step or application server is required.
+
+### Construction notes
+
+- **Oval:** two 2 m straights and two half circles of centerline radius 0.40 m.
+  The finish splits the main straight equally. Lane offsets of 0.05 m give
+  radii of 0.35 m and 0.45 m.
+- **Speedway:** four quarter circles of radius 0.40 m, two 2 m straights and
+  two 1 m side straights, with the finish halfway along the main straight.
+- **Chicane:** the S-bend has two opposite 135 degree arcs of radius 0.20 m.
+  Its sideways displacement is `2 * 0.2 * (1 + sqrt(1/2))`, about 0.68 m,
+  and its forward displacement is `2 * 0.2 * sqrt(1/2)`, about 0.28 m.
+  The first clockwise half turn tightens from radius 1.1 m to
+  `1 + sideways displacement - 1.1` m. The other widens from 0.35 m to 0.65 m.
+  Their different displacements close the layout with the 3.5 m return straight.
+  The finish divides its other straight into two 0.6 m parts, separated from
+  the first half turn by the S-bend and another 1.2 m straight.
+  The long tight S-bend is intended to require slowing down: the original
+  calibration measured spin-outs from about 2 m/s at constant speed, compared
+  with about 3.4 m/s for the earlier pair of 45 degree arcs. At full throttle
+  the 3.5 m return straight reached about 4 m/s from rest or from 3 m/s; the
+  equilibrium speed of the unchanged parameters was 4.44 m/s.
+- **Teardrop:** radii of 0.60 m and 0.30 m with centers 1.5 m apart.
+  The tangent tilt is `asin((0.6 - 0.3) / 1.5)` and the tangent length is
+  `sqrt(1.5 ** 2 - (0.6 - 0.3) ** 2)`. The hairpin turns through
+  `PI - 2 * tilt`, the wide curve through `PI + 2 * tilt`; the finish splits
+  one tangent equally.
+- **Club:** a rounded 4 m by 3 m L, traversed clockwise. Before rounding,
+  vertices are `(0,0)`, `(4,0)`, `(4,1.5)`, `(1.5,1.5)`, `(1.5,3)`, `(0,3)`,
+  translated by -2 m in x to place the finish at `(0,0)`. Each quarter circle
+  trims its radius from both adjacent sides. In travel order the radii are
+  1.2, 0.35, 0.50, 0.30, 0.35 and 0.40 m; only the fourth curve turns left.
+  The finish splits the 2.4 m main straight into 1.6 m before and 0.8 m after it.
+
+The geometry regression fixture records lane lengths, piece endpoints and lane
+poses captured before moving the definitions to JSON. Separate tests retain
+length formulas and validate parsing, catalog loading and HTTP error handling.
+
 ## Project layout
 
 ```
 index.html, style.css, favicon.svg   the page
 src/main.js                          entry point and main loop
+circuits/                            ordered index and per-circuit JSON data
+src/data/                            asynchronous circuit catalog loading
 src/core/                            pure logic: geometry, circuits, physics,
                                      simulation, stepper, game, lap timer, controls, timing
 src/ui/                              canvas drawing, input, timing panel, circuit menu
