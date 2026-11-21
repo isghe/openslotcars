@@ -342,6 +342,7 @@ test('marks follow the rear wheels off the track until the car stops', () => {
     marks.record(spinning[i], context);
     const fresh = marks.segments(spinning[i].time).filter((segment) => segment.alpha === 1);
     if (spinning[i].car.speed === 0) {
+      assert.equal(spinning[i].car.yawRate, 0, `step ${i}: spinning in place`);
       stoppedSteps += 1;
       assert.equal(fresh.length, 0, `step ${i}: stopped`);
       continue;

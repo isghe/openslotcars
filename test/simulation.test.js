@@ -1,11 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { OVAL, buildCircuit } from './helpers/circuits.js';
+import { CIRCUITS, OVAL, buildCircuit } from './helpers/circuits.js';
 import { straight, curve, createTrack, createLane } from '../src/core/geometry.js';
-import { terminalSpeed, withParams, DEFAULT_PARAMS } from '../src/core/physics.js';
+import { terminalSpeed, withParams, DEFAULT_PARAMS, stepYaw, stepLongitudinal, scrubDeceleration } from '../src/core/physics.js';
 import {
   DEFAULT_RULES,
-  SLIDE_SPIN,
   createContext,
   createWorld,
   stepWorld,
@@ -436,6 +435,60 @@ test('full throttle spins the car out of the first curve, later than the plain m
   assert.ok(slide.every((world) => world.car.slip === exit.car.slip));
 });
 
+test('leaving the slot preserves the body angular velocity, with friction slowing it afterwards', () => {
+  const context = tailContext('inner');
+  const history = run(context, 3, () => 1);
+  const exitIndex = history.findIndex((world) => world.car.status === 'offTrack');
+  const before = history[exitIndex - 1].car;
+  const exit = history[exitIndex];
+  const next = stepLongitudinal(before, 1, context.dt, context.params,
+    scrubDeceleration(before.speed, before.rearSlip, context.params));
+  const turn = context.lane.poseAt(next.distance).heading - context.lane.poseAt(before.distance).heading;
+  const body = stepYaw(before, { speed: next.speed, curvature: context.lane.curvatureAt(next.distance), turn }, context.dt, context.params);
+  assert.ok(Math.abs(exit.car.yawRate - body.yawRate) < 1e-12);
+  assert.equal(exit.car.rotation, 0);
+  const after = history[exitIndex + 1];
+  assert.ok(Math.abs(after.car.yawRate) < Math.abs(exit.car.yawRate));
+  const torque = context.params.offTrackFrictionTorque / (1 + after.car.speed / context.params.offTrackRotationSpeed);
+  const angularDeceleration = torque / context.params.bodyRadiusOfGyration ** 2;
+  const duration = Math.min(context.dt, Math.abs(exit.car.yawRate) / angularDeceleration);
+  const expectedTurn = exit.car.yawRate * duration
+    - Math.sign(exit.car.yawRate) * angularDeceleration * duration ** 2 / 2;
+  assert.ok(Math.abs(carPose(after, context).heading - carPose(exit, context).heading - expectedTurn) < 1e-12);
+});
+
+test('off-track rotation follows angular velocity rather than slip until translation stops', () => {
+  const context = tailContext('inner');
+  const exit = run(context, 3, () => 1).find((world) => world.car.status === 'offTrack');
+  const spinning = { ...exit, car: { ...exit.car, speed: 1, yawRate: -8, rotation: 0 } };
+  const after = stepWorld(spinning, { throttle: 1 }, context);
+  assert.ok(after.car.travel > 0);
+  assert.ok(carPose(after, context).heading < carPose(spinning, context).heading);
+  const notSpinning = { ...exit, car: { ...exit.car, yawRate: 0, rotation: 0 } };
+  const moving = stepWorld(notSpinning, { throttle: 1 }, context);
+  assert.ok(moving.car.travel > 0);
+  assert.equal(carPose(moving, context).heading, carPose(notSpinning, context).heading);
+  const stopped = run(context, 1, () => 1, spinning).at(-1);
+  assert.equal(stopped.car.yawRate, 0);
+  assert.equal(stepWorld(stopped, { throttle: 1 }, context).car.rotation, stopped.car.rotation);
+});
+
+test('rotation stops with translation on every circuit', () => {
+  for (const definition of CIRCUITS) {
+    const context = createContext({ lane: buildCircuit(definition).lanes.inner });
+    const history = run(context, 6, () => 1);
+    const exitIndex = history.findIndex((world) => world.car.status === 'offTrack');
+    assert.ok(exitIndex > 0, `${definition.id}: no exit`);
+    const slide = history.slice(exitIndex, exitIndex + context.recoverySteps);
+    const stationary = slide.find((world) => world.car.speed === 0);
+    const settled = slide.find((world) => world.car.speed === 0 && world.car.yawRate === 0);
+    assert.ok(stationary && settled, `${definition.id}: no stop`);
+    assert.equal(stationary.car.yawRate, 0, `${definition.id}: spinning in place`);
+    assert.equal(stationary.car.rotation, settled.car.rotation, `${definition.id}: rotation after stop`);
+    assert.equal(settled.time, stationary.time, `${definition.id}: delayed angular stop`);
+  }
+});
+
 test('a throttle that the plain model cannot hold is held by a sliding tail', () => {
   const plain = run(contextFor('inner'), 60, () => 0.6);
   assert.ok(plain.some((world) => world.car.status === 'offTrack'));
@@ -617,7 +670,8 @@ test('a car that spins out slides along the tangent, from where its body was', (
   // It keeps turning the way it was turning: counterclockwise, the tail out
   // of a curve to the left.
   assert.ok(exit.car.slip > 0);
-  assert.ok(Math.abs(slid.heading - (start.heading + SLIDE_SPIN * travel)) < 1e-9);
+  assert.ok(later.car.rotation > 0);
+  assert.ok(Math.abs(slid.heading - (start.heading + later.car.rotation)) < 1e-9);
 });
 
 test('a car that spins out of a curve to the right keeps turning to the right', () => {
@@ -636,7 +690,10 @@ test('a car that spins out of a curve to the right keeps turning to the right', 
   const start = carPose(exit, context);
   const later = history[exitIndex + 30];
   const slid = carPose(later, context);
-  assert.ok(Math.abs(slid.heading - (start.heading - SLIDE_SPIN * later.car.travel)) < 1e-9);
+  assert.ok(later.car.rotation < 0);
+  assert.ok(Math.abs(slid.heading - (start.heading + later.car.rotation)) < 1e-9);
+  assert.ok(Math.abs(later.car.rotation + run(tailContext('inner'), 3, () => 1)
+    [exitIndex + 30].car.rotation) < 1e-9);
 });
 
 test('the slip is interpolated between two steps with the tail rule', () => {
@@ -668,11 +725,23 @@ test('without the tail rule the interpolated car has no slip', () => {
   assert.equal('slip' in middle.car, false);
 });
 
-test('a car spinning off the track keeps its angle when it is interpolated', () => {
+test('off-track interpolation smooths rotation independently of translation', () => {
   const context = tailContext('inner');
   const history = run(context, 3, () => 1);
   const exitIndex = history.findIndex((world) => world.car.status === 'offTrack');
   const middle = interpolateWorld(history[exitIndex + 10], history[exitIndex + 11], 0.5);
   assert.equal(middle.car.slip, history[exitIndex].car.slip);
   assert.equal(middle.car.status, 'offTrack');
+  const before = history[exitIndex + 10];
+  const after = history[exitIndex + 11];
+  assert.notEqual(before.car.rotation, after.car.rotation);
+  assert.equal(middle.car.rotation, (before.car.rotation + after.car.rotation) / 2);
+  const first = carPose(before, context);
+  const last = carPose(after, context);
+  assert.ok(Math.abs(carPose(middle, context).heading - (first.heading + last.heading) / 2) < 1e-12);
+  const parkedBefore = { ...before, car: { ...before.car, travel: 0, speed: 0 } };
+  const parkedAfter = { ...after, car: { ...after.car, travel: 0, speed: 0 } };
+  const rotating = interpolateWorld(parkedBefore, parkedAfter, 0.5);
+  assert.equal(rotating.car.travel, 0);
+  assert.equal(rotating.car.rotation, middle.car.rotation);
 });

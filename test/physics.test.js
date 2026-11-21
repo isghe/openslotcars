@@ -10,6 +10,7 @@ import {
   criticalSpeed,
   hasLostGrip,
   stepOffTrack,
+  stepOffTrackRotation,
   stepYaw,
   hasSpunOut,
   scrubDeceleration,
@@ -200,6 +201,69 @@ test('a car sliding off the track slows down at the table deceleration', () => {
   near(state.travel, 16 / (2 * deceleration), 0.02);
   assert.equal(state.speed, 0);
   assert.deepEqual(stepOffTrack(state, DT), state);
+});
+
+test('free rotation conserves angular momentum without torque', () => {
+  const params = { ...DEFAULT_PARAMS, offTrackFrictionTorque: 0 };
+  for (const yawRate of [-8, 0, 8]) {
+    const state = { rotation: 1, yawRate, speed: 3 };
+    const after = stepOffTrackRotation(state, 0.25, params);
+    assert.equal(after.yawRate, yawRate);
+    near(after.rotation, 1 + yawRate * 0.25, 1e-12);
+  }
+});
+
+test('rotational friction dissipates energy and greater inertia slows the loss', () => {
+  for (const sign of [-1, 1]) {
+    const params = withParams({ offTrackFrictionTorque: 0.04, bodyRadiusOfGyration: 0.05 });
+    const state = { rotation: 0, yawRate: sign * 4, speed: 1 };
+    const after = stepOffTrackRotation(state, 0.25, params);
+    near(after.yawRate, sign * 2, 1e-12);
+    near(after.rotation, sign * 0.75, 1e-12);
+    assert.ok(after.yawRate ** 2 < state.yawRate ** 2);
+    const heavier = stepOffTrackRotation(state, 0.25, { ...params, bodyRadiusOfGyration: 0.1 });
+    assert.ok(Math.abs(heavier.yawRate) > Math.abs(after.yawRate));
+    const stopped = stepOffTrackRotation(state, 2, params);
+    assert.equal(stopped.yawRate, 0);
+    near(stopped.rotation, sign, 1e-12);
+    assert.deepEqual(stepOffTrackRotation({ ...stopped, speed: 1 }, 1, params), stopped);
+    let split = state;
+    for (let i = 0; i < 200; i += 1) split = stepOffTrackRotation({ ...split, speed: 1 }, 0.01, params);
+    near(split.rotation, stopped.rotation, 1e-12);
+    assert.equal(split.yawRate, 0);
+  }
+});
+
+test('off-track rotational damping increases as the car slows down', () => {
+  for (const sign of [-1, 1]) {
+    const atSpeed = (speed) => stepOffTrackRotation({ rotation: 0, yawRate: sign * 12, speed }, 0.05);
+    const fast = atSpeed(3);
+    const slow = atSpeed(1);
+    const stationary = atSpeed(0);
+    assert.ok(Math.abs(fast.yawRate) > Math.abs(slow.yawRate));
+    assert.ok(Math.abs(slow.yawRate) > Math.abs(stationary.yawRate));
+    assert.ok(Math.abs(fast.rotation) > Math.abs(slow.rotation));
+    assert.ok(Math.abs(slow.rotation) > Math.abs(stationary.rotation));
+  }
+});
+
+test('a car with no translational speed cannot keep spinning in place', () => {
+  for (const yawRate of [-12, 12]) {
+    assert.deepEqual(stepOffTrackRotation({ rotation: 1, yawRate, speed: 0 }, DT), {
+      rotation: 1, yawRate: 0,
+    });
+  }
+});
+
+test('off-track rotation rejects invalid state and time steps', () => {
+  for (const dt of [0, -1, NaN, Infinity]) {
+    assert.throws(() => stepOffTrackRotation({ rotation: 0, yawRate: 1 }, dt), RangeError);
+  }
+  assert.throws(() => stepOffTrackRotation({ rotation: NaN, yawRate: 1 }, DT), RangeError);
+  assert.throws(() => stepOffTrackRotation({ rotation: 0, yawRate: Infinity }, DT), RangeError);
+  for (const speed of [-1, NaN, Infinity]) {
+    assert.throws(() => stepOffTrackRotation({ rotation: 0, yawRate: 1, speed }, DT), RangeError);
+  }
 });
 
 test('grip functions reject invalid arguments', () => {
