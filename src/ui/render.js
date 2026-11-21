@@ -16,6 +16,7 @@
 import { createLane } from '../core/geometry.js';
 import { carPose } from '../core/simulation.js';
 import { createTireMarks } from './tireMarks.js';
+import { curveBoundaries, sectionMidpoints } from './curveMarkers.js';
 
 const PALETTE = Object.freeze({
   background: '#0f1216',
@@ -29,6 +30,10 @@ const PALETTE = Object.freeze({
   carWindow: '#1b2430',
   pinCore: '#000000',
   pinRing: '#ffffff',
+  curveEntry: '#65cfff',
+  sectionMidpoint: '#d6a2ff',
+  curbRed: '#d95454',
+  curbWhite: '#e8e5df',
 });
 
 // Sizes in meters. A 1:32 car is about 13 cm long.
@@ -75,15 +80,19 @@ const DIRECTION_MARK_WIDTH = 0.012;
 const DIRECTION_MARK_OPACITY = 0.85;
 const SAMPLE_SPACING = 0.02;
 const MARGIN = 0.06;
+const ENTRY_WIDTH = 0.004;
+const CURB_WIDTH = 0.035;
+const CURB_BLOCK_LENGTH = 0.10;
 
 /**
  * Creates a renderer for a circuit.
  * @param {HTMLCanvasElement} canvas Canvas to draw on.
  * @param {{track: object, trackWidth: number, lanes: Object<string, object>}} circuit
  * @param {object} context Simulation context (see `createContext`).
+ * @param {{curveMarkers?: boolean, curbs?: boolean}} options Optional visual previews.
  * @returns {{draw: function(object): void, resize: function(): void}}
  */
-export function createRenderer(canvas, circuit, context) {
+export function createRenderer(canvas, circuit, context, { curveMarkers = false, curbs = false } = {}) {
   const surface = canvas.getContext('2d');
   if (surface === null) throw new Error('the canvas has no 2D drawing context');
 
@@ -92,6 +101,41 @@ export function createRenderer(canvas, circuit, context) {
   const lanePoints = Object.values(circuit.lanes).map((lane) => lane.sample(SAMPLE_SPACING));
   const finish = centerLane.poseAt(0);
   const tireMarks = createTireMarks();
+  const boundaries = curveMarkers ? curveBoundaries(circuit.track) : [];
+  const midpoints = curveMarkers ? sectionMidpoints(circuit.track) : [];
+  const curbBlocks = curbs ? buildCurbBlocks() : [];
+
+  /** Alternating blocks outside each curve; offsets follow its local turn. */
+  function buildCurbBlocks() {
+    const blocks = [];
+    let distance = 0;
+    for (const piece of circuit.track.pieces) {
+      const length = piece.type === 'curve' ? piece.radius * Math.abs(piece.angle) : piece.length;
+      if (piece.type === 'curve') {
+        const side = -Math.sign(piece.angle);
+        const inner = circuit.trackWidth / 2 + EDGE_WIDTH;
+        const outer = inner + CURB_WIDTH;
+        const count = Math.max(2, Math.round((piece.radius + outer) * Math.abs(piece.angle) / CURB_BLOCK_LENGTH));
+        for (let block = 0; block < count; block += 1) {
+          const steps = Math.max(1, Math.ceil(length / count / SAMPLE_SPACING));
+          const inside = [];
+          const outside = [];
+          for (let step = 0; step <= steps; step += 1) {
+            const pose = centerLane.poseAt(distance + length * (block + step / steps) / count);
+            const pointAt = (offset) => ({
+              x: pose.x - Math.sin(pose.heading) * side * offset,
+              y: pose.y + Math.cos(pose.heading) * side * offset,
+            });
+            inside.push(pointAt(inner));
+            outside.push(pointAt(outer));
+          }
+          blocks.push({ points: [...inside, ...outside.reverse()], red: block % 2 === 0 });
+        }
+      }
+      distance += length;
+    }
+    return blocks;
+  }
 
   // Bounding box of the track surface, with a margin.
   const half = circuit.trackWidth / 2 + EDGE_WIDTH + MARGIN;
@@ -160,6 +204,21 @@ export function createRenderer(canvas, circuit, context) {
       }
       drawDirectionMark();
     });
+  }
+
+  function drawReferenceLines(poses, color) {
+    for (const pose of poses) {
+      withPose(pose, () => {
+        surface.strokeStyle = color;
+        surface.globalAlpha = 0.65;
+        surface.lineWidth = Math.max(1, ENTRY_WIDTH * scale);
+        surface.lineCap = 'butt';
+        surface.beginPath();
+        surface.moveTo(0, -circuit.trackWidth * scale / 2);
+        surface.lineTo(0, circuit.trackWidth * scale / 2);
+        surface.stroke();
+      });
+    }
   }
 
   /**
@@ -286,8 +345,15 @@ export function createRenderer(canvas, circuit, context) {
     surface.fillStyle = PALETTE.background;
     surface.fillRect(0, 0, width, height);
 
+    for (const block of curbBlocks) {
+      tracePath(block.points);
+      surface.fillStyle = block.red ? PALETTE.curbRed : PALETTE.curbWhite;
+      surface.fill();
+    }
     strokePath(centerPoints, PALETTE.edge, circuit.trackWidth + 2 * EDGE_WIDTH);
     strokePath(centerPoints, PALETTE.surface, circuit.trackWidth);
+    drawReferenceLines(boundaries, PALETTE.curveEntry);
+    drawReferenceLines(midpoints, PALETTE.sectionMidpoint);
     for (const points of lanePoints) strokePath(points, PALETTE.slot, SLOT_WIDTH);
     drawFinishLine();
     // While the game is paused no step runs, so the marks stay.

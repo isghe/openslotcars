@@ -75,6 +75,28 @@ The logic in `src/core/` is pure: it does not touch the page, read a clock or us
 
 ## Circuit data
 
+### Curve-boundary preview
+
+Add `&curve-markers=1` to a circuit URL to preview thin blue lines across
+the road at curve entrances and exits, for example `?circuit=club&curve-markers=1`
+or `?circuit=infinite-loop&curve-markers=1`. Without the argument, the drawing
+remains unchanged. The preview is being evaluated on Club and Infinite Loop
+before deciding whether to enable it by default for all circuits.
+
+Each join between arcs has one shared exit/entry line, even when both arcs
+turn the same way. This also shows changes of radius in compound corners.
+Violet lines mark the midpoint of each individual arc and each continuous
+straight. Adjacent straight pieces are joined, including the two parts of
+the finish straight. A midpoint at the finish is drawn below the checkerboard.
+Each line
+lies perpendicular to travel at the boundary, derived from the existing
+geometry; it is a position reference, not a calculated braking or throttle
+point. Slots, tire marks and the car are drawn above the lines. A minimum
+stroke width keeps them visible on small screens. The marks do not change
+the track, physics, timing or circuit data.
+
+### Definition format
+
 Each circuit is defined in `circuits/<id>.json`. The ordered filename list in
 `circuits/index.json` supplies the menu order. The data fields are `id`, `name`,
 `pieces`, `start` (`x`, `y`, `heading`), `trackWidth` and `lanes` (`inner`, `outer`).
