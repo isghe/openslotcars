@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { OVAL, buildCircuit } from './helpers/circuits.js';
 import { DEFAULT_PARAMS, scrubDeceleration } from '../src/core/physics.js';
 import { createGame } from '../src/core/game.js';
-import { createContext, createWorld, stepWorld } from '../src/core/simulation.js';
+import { carPose, createContext, createWorld, stepWorld } from '../src/core/simulation.js';
 import { createTireMarks } from '../src/ui/tireMarks.js';
 
 const circuit = buildCircuit(OVAL);
@@ -326,26 +326,63 @@ test('a short pause of the slide breaks the mark in two', () => {
   assert.equal(marks.size, joined + 2);
 });
 
-test('nothing is recorded off the track or with the tail rule off', () => {
+test('marks follow the rear wheels off the track until the car stops', () => {
   // The car slides its tail and then spins off the track at full throttle.
   const spinning = play(context, 4, 1);
   const exitIndex = spinning.findIndex((world) => world.car.status === 'offTrack');
   assert.ok(exitIndex > 0);
   const marks = createTireMarks();
   for (let i = 0; i < exitIndex; i += 1) marks.record(spinning[i], context);
-  const before = marks.size;
-  assert.ok(before > 0, 'no mark before the exit');
+  assert.ok(marks.size > 0, 'no mark before the exit');
   let offSteps = 0;
+  let movingSteps = 0;
+  let stoppedSteps = 0;
   for (let i = exitIndex; i < spinning.length && spinning[i].car.status === 'offTrack'; i += 1) {
     offSteps += 1;
     marks.record(spinning[i], context);
-    // Nothing is added (the old marks may only expire) and none is fresh.
-    assert.ok(marks.size <= before, `step ${i}: size ${marks.size}`);
-    assert.ok(marks.segments(spinning[i].time).every((segment) => segment.alpha < 1), `step ${i}`);
+    const fresh = marks.segments(spinning[i].time).filter((segment) => segment.alpha === 1);
+    if (spinning[i].car.speed === 0) {
+      stoppedSteps += 1;
+      assert.equal(fresh.length, 0, `step ${i}: stopped`);
+      continue;
+    }
+    movingSteps += 1;
+    assert.equal(fresh.length, 2, `step ${i}: moving`);
+    // Use the drawn body pose, including its spin off the track, to locate
+    // each wheel independently of the marks module.
+    const wheelAt = (world, side) => {
+      const pose = carPose(world, context);
+      const back = REAR - DEFAULT_PARAMS.pinToCenterOfMass;
+      return {
+        x: pose.x - back * Math.cos(pose.heading) - side * HALF_TRACK * Math.sin(pose.heading),
+        y: pose.y - back * Math.sin(pose.heading) + side * HALF_TRACK * Math.cos(pose.heading),
+      };
+    };
+    for (const [index, side] of [[0, 1], [1, -1]]) {
+      const from = wheelAt(spinning[i - 1], side);
+      const to = wheelAt(spinning[i], side);
+      near(fresh[index].x1, from.x, 1e-12);
+      near(fresh[index].y1, from.y, 1e-12);
+      near(fresh[index].x2, to.x, 1e-12);
+      near(fresh[index].y2, to.y, 1e-12);
+      assert.ok(Number.isFinite(fresh[index].strength));
+      assert.ok(Number.isFinite(fresh[index].heat));
+      if (i > exitIndex) {
+        assert.equal(fresh[index].strength, 1);
+        assert.equal(fresh[index].heat, 1);
+      }
+    }
   }
   // The whole stay off the track was checked, not only its first steps.
   assert.equal(offSteps, context.recoverySteps);
+  assert.ok(movingSteps > 1);
+  assert.ok(stoppedSteps > 1);
+  const recovered = spinning[exitIndex + offSteps];
+  marks.record(recovered, context);
+  assert.equal(marks.segments(recovered.time).filter((segment) => segment.alpha === 1).length, 0);
+});
 
+test('nothing is recorded with the tail rule off', () => {
   const plainContext = createContext({ lane, rules: { tailSlide: false } });
   const plain = createTireMarks();
   for (const world of play(plainContext, 10, 1)) plain.record(world, plainContext);

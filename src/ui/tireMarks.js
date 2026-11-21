@@ -4,7 +4,8 @@
  * It is only a visual aid and does not touch the simulation. The page reports
  * to `record` the world after every simulation step, and the module keeps the
  * short line segments that the two rear wheels traced between two consecutive
- * steps while they were sliding sideways (`rearSlip` not zero). Each segment
+ * steps while they were sliding sideways (`rearSlip` not zero), and while the
+ * car slides off the track until it stops. Each segment
  * fades out linearly over the lifetime and is then forgotten, so the memory
  * stays small. The marks are made of the steps and not of the frames that are
  * drawn, so they are the same whatever the frame rate: a slow frame brings
@@ -22,6 +23,9 @@
  * to `fullIntensity` and then rising in proportion to 1 at `hotIntensity`. The
  * strength says how visible a mark is, the heat how close the slide was to
  * losing the car; the page uses it to tint the mark.
+ * Off the track the car slides freely on the table, so its marks use full
+ * sliding intensity until it stops. Recovery never joins marks across the
+ * move back to the lane.
  *
  * Time is the time of the world, in seconds, so a pause (the same world again)
  * freezes the marks. A restart clears them: `reset` says so, and a world whose
@@ -48,6 +52,9 @@ function checkPositive(name, value) {
 
 /** How hard the tail slides, from 0 (not at all) to 1 (the whole rear grip). */
 function slideIntensity(car) {
+  // Off the track the car slides freely on the table: rearSlip is no longer
+  // part of its state. Use full sliding intensity while it is moving.
+  if (car.status === 'offTrack') return 1;
   return Math.min(1, Math.abs(car.rearSlip) / car.speed);
 }
 
@@ -93,6 +100,7 @@ export function createTireMarks({
     const side = { x: -Math.sin(pose.heading), y: Math.cos(pose.heading) };
     return {
       time: world.time,
+      status: world.car.status,
       intensity: slideIntensity(world.car),
       left: { x: axle.x + halfTrack * side.x, y: axle.y + halfTrack * side.y },
       right: { x: axle.x - halfTrack * side.x, y: axle.y - halfTrack * side.y },
@@ -132,12 +140,13 @@ export function createTireMarks({
       if (expired > 0) marks = marks.slice(expired);
 
       const car = world.car;
-      if (car.status !== 'onTrack' || car.rearSlip === 0) {
+      if (car.speed === 0 || (car.status === 'onTrack' && car.rearSlip === 0)) {
         previous = null;
         return;
       }
       const current = wheelsOf(world, context);
-      if (previous !== null && time - previous.time <= MAX_GAP) {
+      if (previous !== null && time - previous.time <= MAX_GAP
+        && !(previous.status === 'offTrack' && current.status === 'onTrack')) {
         // The mark is as strong as the slide was between the two worlds.
         const intensity = (previous.intensity + current.intensity) / 2;
         const strength = Math.min(1, intensity / fullIntensity);
