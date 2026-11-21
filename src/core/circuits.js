@@ -148,7 +148,9 @@ export const TEARDROP = Object.freeze({
  * (1.5, 3) and (0, 3), translated by -2 m in x to put the finish at (0, 0).
  * Each quarter circle trims its radius from both adjoining sides, including
  * the left turn in the reentrant corner.
- * The 3.2 m main straight is split equally by the finish line. Five right
+ * The first curve has a 1.2 m radius; the straights before and after it
+ * are shortened to keep the same outline. The finish line splits the 2.4 m
+ * main straight into 1.6 m before the line and 0.8 m after it. Five right
  * turns and one left turn give a net clockwise full turn; their different
  * radii and the change of direction break up the fast main straight.
  */
@@ -156,13 +158,13 @@ export const CLUB = Object.freeze({
   id: 'club',
   name: 'Club',
   pieces: Object.freeze([
-    straight(1.6),
-    curve(0.4, -Math.PI / 2),
-    straight(2.1),
-    curve(0.5, -Math.PI / 2),
-    straight(0.65),
+    straight(0.8),
+    curve(1.2, -Math.PI / 2),
+    straight(1.45),
     curve(0.35, -Math.PI / 2),
-    straight(0.85),
+    straight(0.65),
+    curve(0.5, -Math.PI / 2),
+    straight(0.7),
     curve(0.3, Math.PI / 2),
     straight(1.85),
     curve(0.35, -Math.PI / 2),
