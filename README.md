@@ -42,7 +42,7 @@ A wide curve at one end and a tight hairpin at the other, joined by two straight
 
 [![The L-shaped Club circuit seen from above, with the yellow car sliding in the top left corner and its tire marks behind it](docs/circuit-club.png)](https://isghe.github.io/openslotcars/?circuit=club)
 
-The longest circuit. A rounded L driven clockwise, with a wide first curve, five right turns of different radii and a left turn in the inside corner. A lap is 12.36 m long.
+The longest circuit. A rounded L driven clockwise, with a wide first curve, five right turns of different radii and a left turn in the inside corner. A lap is 11.16 m long.
 
 ### Infinite Loop
 
