@@ -29,6 +29,7 @@ const PALETTE = Object.freeze({
   finishBest: '#00ff66',
   sectorSlower: '#ffd400',
   cumulativeBest: '#c060ff',
+  timingInvalid: '#ff0000',
   carBody: '#ffd400',
   carOffTrack: '#ff0000',
   carOutline: '#000000',
@@ -250,14 +251,16 @@ export function createRenderer(canvas, circuit, context, {
   }
 
   /** Fixed squares beside each sector end, clear of the track and curbs. */
-  function drawSectorMarks(sectors, cumulative) {
+  function drawSectorMarks(sectors, cumulative, splits) {
     sectorEnds.forEach((pose, index) => {
       withPose(surface, pose, () => {
         // A pair of squares on each side, just before the boundary:
         // Sector: green for a best time, yellow if slower, white if unavailable.
-        // Then purple for a record elapsed time from the start.
-        [{ green: PALETTE.finishBest, yellow: PALETTE.sectorSlower, white: PALETTE.checkerLight }[sectors[index]],
-          cumulative[index] ? PALETTE.cumulativeBest : PALETTE.checkerLight].forEach((color, row) => {
+        // Cumulative: purple for a record, otherwise white. Invalid times are red.
+        [{ green: PALETTE.finishBest, yellow: PALETTE.sectorSlower,
+          red: PALETTE.timingInvalid, white: PALETTE.checkerLight }[sectors[index]],
+          splits[index]?.valid === false ? PALETTE.timingInvalid
+            : cumulative[index] ? PALETTE.cumulativeBest : PALETTE.checkerLight].forEach((color, row) => {
           surface.fillStyle = color;
           const offset = circuit.trackWidth / 2 + EDGE_WIDTH + CURB_WIDTH + SECTOR_MARK_GAP;
           for (const y of [-offset - SECTOR_MARK_SIZE, offset]) {
@@ -455,7 +458,7 @@ export function createRenderer(canvas, circuit, context, {
     if (restarted) tireMarks.reset();
     for (const step of steps) tireMarks.record(step, context);
     drawTireMarks(world.time);
-    if (showSectorFeedback) drawSectorMarks(sectorFeedback(world.timer), cumulativeFeedback(world.timer));
+    if (showSectorFeedback) drawSectorMarks(sectorFeedback(world.timer), cumulativeFeedback(world.timer), world.timer.lastSplits);
     drawFinishLine(surface);
     drawCar(world);
     if (paused) drawPauseOverlay();

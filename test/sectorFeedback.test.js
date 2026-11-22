@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createLapTimer, advanceTimer } from '../src/core/lapTimer.js';
+import { createLapTimer, advanceTimer, markExit } from '../src/core/lapTimer.js';
 import { createContext, createWorld } from '../src/core/simulation.js';
 import { createRenderer } from '../src/ui/render.js';
 import { CIRCUITS, buildCircuit } from './helpers/circuits.js';
@@ -75,6 +75,23 @@ for (const definition of CIRCUITS) {
       previousTime += 2;
       previousDistance = distance;
       assert.deepEqual(draw(), { green: 2 * (4 - boundary), purple: 2 * (4 - boundary), yellow: 2 * boundary });
+    }
+    // An exit makes its sector and every remaining cumulative time invalid.
+    const redSquares = () => drawing.rectangles.filter(rectangle => rectangle.color === '#ff0000'
+      && Math.abs(rectangle.bounds[2] - rectangle.bounds[3]) < 1e-9).length;
+    timer = markExit(timer);
+    draw();
+    assert.equal(redSquares(), 0); // Feedback changes only at the boundary.
+    for (let boundary = 1; boundary <= 8; boundary += 1) {
+      // End beyond the line to avoid rounding onto its approach side.
+      const distance = context.laneLength * (2 + boundary / 4 + 1e-6);
+      ({ timer } = advanceTimer(timer, {
+        previousTime, dt: 3, previousDistance, distance, laneLength: context.laneLength,
+      }));
+      previousTime += 3;
+      previousDistance = distance;
+      draw();
+      assert.equal(redSquares(), [4, 6, 8, 10, 6, 4, 2, 0][boundary - 1]);
     }
     timer = createLapTimer();
     assert.deepEqual(draw(), { green: 0, purple: 0, yellow: 0 });

@@ -188,10 +188,11 @@ function recordSectorCrossing(timer, time, number) {
   };
 }
 
-/** Colors for the last sector attempt: white if unavailable or invalid, green for a best time, yellow if slower. */
+/** Colors for the last sector attempt: white if unavailable, red if invalid, green for a best time, yellow if slower. */
 export function sectorFeedback(timer) {
   return timer.lastSectors.map((sector, index) => {
-    if (sector === null || !sector.valid) return 'white';
+    if (sector === null) return 'white';
+    if (!sector.valid) return 'red';
     return sector.time === timer.bestSectors[index]?.time ? 'green' : 'yellow';
   });
 }

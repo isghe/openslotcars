@@ -16,7 +16,7 @@ import {
 
 const L = 6;
 
-test('sector feedback is white without a valid attempt, yellow when slower and green for records and ties', () => {
+test('sector feedback is white when unavailable, red when invalid, yellow when slower and green for records and ties', () => {
   let timer = recordCrossing(createLapTimer(), 0);
   let time = 0;
   let distance = 0;
@@ -31,7 +31,7 @@ test('sector feedback is white without a valid attempt, yellow when slower and g
   };
   assert.deepEqual(sectorFeedback(timer), Array(4).fill('white'));
   complete(1, true);
-  assert.deepEqual(sectorFeedback(timer), Array(4).fill('white'));
+  assert.deepEqual(sectorFeedback(timer), ['red', 'white', 'white', 'white']);
   for (let i = 0; i < 4; i += 1) complete(2);
   assert.deepEqual(sectorFeedback(timer), Array(4).fill('green'));
   for (const duration of [3, 2, 1, 3]) complete(duration);
@@ -39,7 +39,7 @@ test('sector feedback is white without a valid attempt, yellow when slower and g
   // The tied third sector stays green without replacing the record object.
   assert.notEqual(timer.lastSectors[2], timer.bestSectors[2]);
   complete(1, true);
-  assert.equal(sectorFeedback(timer)[1], 'white');
+  assert.equal(sectorFeedback(timer)[1], 'red');
   assert.deepEqual(sectorFeedback(restartLapTimer(timer)), Array(4).fill('white'));
 });
 
@@ -99,9 +99,9 @@ test('sector feedback compares each attempt with its own session best and persis
   complete(2);
   assert.deepEqual(sectorFeedback(timer), ['yellow', 'green', 'green', 'green']);
   complete(1, true);
-  assert.deepEqual(sectorFeedback(timer), ['yellow', 'green', 'white', 'green']);
+  assert.deepEqual(sectorFeedback(timer), ['yellow', 'green', 'red', 'green']);
   complete(1);
-  assert.deepEqual(sectorFeedback(timer), ['yellow', 'green', 'white', 'green']);
+  assert.deepEqual(sectorFeedback(timer), ['yellow', 'green', 'red', 'green']);
   assert.equal(timer.best, bestLap);
   assert.deepEqual(timer.bestSectors.map(sector => sector.time), [2, 2, 2, 1]);
   assert.equal(timer.laps[1].valid, false);
