@@ -21,9 +21,9 @@ function setText(element, text) {
 
 /**
  * @param {{currentLap: HTMLElement, lastLap: HTMLElement, bestLap: HTMLElement,
- *   laps: HTMLElement, announcer: HTMLElement}} elements
+ *   bestSectorsSum: HTMLElement, laps: HTMLElement, announcer: HTMLElement}} elements
  */
-export function createHud({ currentLap, lastLap, bestLap, laps, announcer }) {
+export function createHud({ currentLap, lastLap, bestLap, bestSectorsSum, laps, announcer }) {
   let shown = null;
 
   return {
@@ -33,6 +33,7 @@ export function createHud({ currentLap, lastLap, bestLap, laps, announcer }) {
       setText(currentLap, texts.currentLap);
       setText(lastLap, texts.lastLap);
       setText(bestLap, texts.bestLap);
+      setText(bestSectorsSum, texts.bestSectorsSum);
       setText(laps, texts.laps);
 
       if (shown !== null) {

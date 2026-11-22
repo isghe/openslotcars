@@ -53,6 +53,7 @@ test('before the first crossing the clock has not started', () => {
     currentLap: 'not started',
     lastLap: 'none yet',
     bestLap: 'none yet',
+    bestSectorsSum: 'none yet',
     laps: '0',
   });
 });
@@ -64,6 +65,26 @@ test('the running lap time is measured from the last crossing', () => {
   assert.ok(summary.currentLap > 0);
   assert.ok(Math.abs(summary.currentLap - (world.time - world.timer.lapStart)) < 1e-12);
   assert.match(formatTiming(summary).currentLap, /^\d\.\d s$/);
+});
+
+test('the sum needs every sector record and uses individual bests across laps', () => {
+  let world = createWorld(context);
+  assert.equal(timingSummary(world).bestSectorsSum, null);
+  world = {
+    ...world,
+    timer: {
+      ...world.timer,
+      bestSectors: [1.1114, 2.2224, 3.3334, null].map((time) => (
+        time === null ? null : { time, valid: true }
+      )),
+    },
+  };
+  assert.equal(timingSummary(world).bestSectorsSum, null);
+  world.timer.bestSectors[3] = { time: 4.4444, valid: true };
+  assert.equal(formatTiming(timingSummary(world)).bestSectorsSum, '11.112 s');
+  world.timer.bestSectors[0] = { time: 1, valid: true };
+  assert.equal(formatTiming(timingSummary(world)).bestSectorsSum, '11.000 s');
+  assert.equal(timingSummary(world).bestLap, null);
 });
 
 test('closed laps are summarized with the best valid one', () => {
@@ -96,6 +117,7 @@ test('minutes appear in a long running lap', () => {
     currentLapHadExit: false,
     lastLap: null,
     bestLap: null,
+    bestSectorsSum: null,
     lapsCompleted: 0,
   };
   assert.equal(formatTiming(summary).currentLap, '1:15.3');

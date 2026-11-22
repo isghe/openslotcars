@@ -9,6 +9,7 @@ function setup() {
     currentLap: { textContent: '' },
     lastLap: { textContent: '' },
     bestLap: { textContent: '' },
+    bestSectorsSum: { textContent: '' },
     laps: { textContent: '' },
     announcer: { textContent: '' },
   };
@@ -22,6 +23,22 @@ test('a restart announces the race restarted and shows the new world', () => {
   assert.equal(elements.announcer.textContent, 'Race restarted.');
   assert.equal(elements.laps.textContent, '0');
   assert.equal(elements.bestLap.textContent, 'none yet');
+  assert.equal(elements.bestSectorsSum.textContent, 'none yet');
+});
+
+test('the best sectors sum updates and clears on restart', () => {
+  const { elements, hud, world } = setup();
+  const timed = {
+    ...world,
+    timer: {
+      ...world.timer,
+      bestSectors: [1.1, 1.2, 1.3, 1.4].map((time) => ({ time, valid: true })),
+    },
+  };
+  hud.update(timed);
+  assert.equal(elements.bestSectorsSum.textContent, '5.000 s');
+  hud.restart(world);
+  assert.equal(elements.bestSectorsSum.textContent, 'none yet');
 });
 
 test('a restart can announce another message, for example a new circuit', () => {
