@@ -4,7 +4,9 @@
  * The finish line sits at arc length 0 of the lane, so the car crosses it each
  * time its total distance (never wrapped) reaches a multiple of the lane
  * length. The first crossing only starts the clock; every later crossing
- * closes a lap.
+ * closes a lap. Three intermediate boundaries divide the lane into four
+ * equal-distance sectors. Each boundary keeps session bests both for the
+ * sector duration and for the cumulative time since the finish line.
  *
  * A lap in which the car left the track is still recorded, but it is marked as
  * not valid and it never counts as the best lap.
@@ -13,6 +15,8 @@
  * new state and leaves its arguments untouched. The module is pure logic: no
  * DOM, no real-time clock, no randomness.
  */
+
+export const SECTOR_COUNT = 4;
 
 function assertFinite(value, name) {
   if (!Number.isFinite(value)) {
@@ -29,11 +33,20 @@ function assertPositiveFinite(value, name) {
 /**
  * Creates a timer that has not started yet.
  * @returns {{lapStart: number|null, currentLapHadExit: boolean,
- *   laps: Array<{number: number, time: number, valid: boolean}>,
+ *   sectorStart: number|null, currentSectorHadExit: boolean, currentSectors: object[],
+ *   lastSectors: Array<object|null>, bestSectors: Array<object|null>,
+ *   lastSplits: Array<object|null>, bestSplits: Array<object|null>,
+ *   laps: Array<{number: number, time: number, valid: boolean, sectors: object[]}>,
  *   best: {number: number, time: number, valid: boolean}|null}}
  */
 export function createLapTimer() {
-  return { lapStart: null, currentLapHadExit: false, laps: [], best: null };
+  return {
+    lapStart: null, currentLapHadExit: false,
+    sectorStart: null, currentSectorHadExit: false, currentSectors: [],
+    lastSectors: Array(SECTOR_COUNT).fill(null), bestSectors: Array(SECTOR_COUNT).fill(null),
+    lastSplits: Array(SECTOR_COUNT).fill(null), bestSplits: Array(SECTOR_COUNT).fill(null),
+    laps: [], best: null,
+  };
 }
 
 /**
@@ -77,21 +90,32 @@ export function crossingTime(previousTime, dt, previousDistance, distance, lineD
 export function recordCrossing(timer, time) {
   assertFinite(time, 'time');
   if (timer.lapStart === null) {
-    return { ...timer, lapStart: time, currentLapHadExit: false };
+    return {
+      ...timer, lapStart: time, currentLapHadExit: false,
+      sectorStart: time, currentSectorHadExit: false, currentSectors: [],
+    };
   }
   if (time < timer.lapStart) {
     throw new RangeError(`crossing at ${time} s is earlier than the lap start ${timer.lapStart} s`);
   }
   const lapTime = time - timer.lapStart;
+  const timed = recordSectorCrossing(timer, time, SECTOR_COUNT);
   const lap = {
     number: timer.laps.length + 1,
     time: lapTime,
     valid: !timer.currentLapHadExit,
+    // Direct finish-only callers cannot supply sector times. Never invent
+    // splits for a lap whose intermediate crossings were not recorded.
+    sectors: timed.currentSectors.length === SECTOR_COUNT ? timed.currentSectors : [],
   };
   const improves = lap.valid && (timer.best === null || lapTime < timer.best.time);
   return {
+    ...timed,
     lapStart: time,
     currentLapHadExit: false,
+    sectorStart: time,
+    currentSectorHadExit: false,
+    currentSectors: [],
     laps: [...timer.laps, lap],
     best: improves ? lap : timer.best,
   };
@@ -103,12 +127,46 @@ export function recordCrossing(timer, time) {
  */
 export function markExit(timer) {
   if (timer.lapStart === null) return timer;
-  return { ...timer, currentLapHadExit: true };
+  return { ...timer, currentLapHadExit: true, currentSectorHadExit: true };
+}
+
+/** Records a split only after the start and all preceding sector boundaries. */
+function recordSectorCrossing(timer, time, number) {
+  if (timer.lapStart === null || timer.currentSectors.length !== number - 1) return timer;
+  const sector = { number, time: time - timer.sectorStart, valid: !timer.currentSectorHadExit };
+  const best = timer.bestSectors[number - 1];
+  const improves = sector.valid && (best === null || sector.time < best.time);
+  const split = { number, time: time - timer.lapStart, valid: !timer.currentLapHadExit };
+  const bestSplit = timer.bestSplits[number - 1];
+  const improvesSplit = split.valid && (bestSplit === null || split.time < bestSplit.time);
+  return {
+    ...timer,
+    sectorStart: time,
+    currentSectorHadExit: false,
+    currentSectors: [...timer.currentSectors, sector],
+    lastSectors: timer.lastSectors.map((last, index) => index === number - 1 ? sector : last),
+    bestSectors: timer.bestSectors.map((last, index) => index === number - 1 && improves ? sector : last),
+    lastSplits: timer.lastSplits.map((last, index) => index === number - 1 ? split : last),
+    bestSplits: timer.bestSplits.map((last, index) => index === number - 1 && improvesSplit ? split : last),
+  };
+}
+
+/** Steady-green states for the last completed attempt at each sector. */
+export function sectorFeedback(timer) {
+  return timer.lastSectors.map((sector, index) => sector !== null
+    && sector.valid && sector === timer.bestSectors[index]);
+}
+
+/** Steady-purple states for cumulative session records at each boundary. */
+export function cumulativeFeedback(timer) {
+  return timer.lastSplits.map((split, index) => split !== null
+    && split.valid && split === timer.bestSplits[index]);
 }
 
 /**
- * Applies one simulation step to the timer: finds every finish line crossing
- * made during the step and records each one at its interpolated instant.
+ * Applies one simulation step to the timer: finds every quarter-lap boundary
+ * and records its interpolated instant. Sector times are durations, not
+ * cumulative splits; the fourth sector closes at the finish line.
  * @param {object} timer Current timer.
  * @param {{previousTime: number, dt: number, previousDistance: number,
  *   distance: number, laneLength: number}} step
@@ -119,10 +177,16 @@ export function advanceTimer(timer, step) {
   const { previousTime, dt, previousDistance, distance, laneLength } = step;
   assertFinite(previousTime, 'previousTime');
   assertPositiveFinite(dt, 'dt');
+  assertPositiveFinite(laneLength, 'laneLength');
   let current = timer;
   const completed = [];
-  for (const k of crossings(previousDistance, distance, laneLength)) {
-    const time = crossingTime(previousTime, dt, previousDistance, distance, k * laneLength);
+  for (const k of crossings(previousDistance, distance, laneLength / SECTOR_COUNT)) {
+    const time = crossingTime(previousTime, dt, previousDistance, distance, (k / SECTOR_COUNT) * laneLength);
+    const sector = ((k % SECTOR_COUNT) + SECTOR_COUNT) % SECTOR_COUNT;
+    if (sector !== 0) {
+      current = recordSectorCrossing(current, time, sector);
+      continue;
+    }
     const before = current.laps.length;
     current = recordCrossing(current, time);
     if (current.laps.length > before) completed.push(current.laps[before]);

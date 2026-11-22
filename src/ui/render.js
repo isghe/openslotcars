@@ -15,6 +15,7 @@
 
 import { createLane } from '../core/geometry.js';
 import { carPose } from '../core/simulation.js';
+import { SECTOR_COUNT, sectorFeedback, cumulativeFeedback } from '../core/lapTimer.js';
 import { createTireMarks } from './tireMarks.js';
 import { curveBoundaries, sectionMidpoints } from './curveMarkers.js';
 
@@ -26,6 +27,7 @@ const PALETTE = Object.freeze({
   checkerLight: '#ffffff',
   checkerDark: '#000000',
   finishBest: '#00ff66',
+  cumulativeBest: '#c060ff',
   carBody: '#ffd400',
   carOffTrack: '#ff0000',
   carOutline: '#000000',
@@ -77,6 +79,8 @@ const TIRE_MARK_COOL = Object.freeze([0xd7, 0xdb, 0xe2]);
 const TIRE_MARK_HOT = Object.freeze([0xff, 0x70, 0x70]);
 const CHECKER_DEPTH = 0.016;
 const CHECKER_CELLS = 8;
+const SECTOR_LINE_WIDTH = 0.024;
+const SECTOR_LINE_GAP = 0.012;
 // The chevron after the finish line that shows the direction of travel. It is
 // narrower than the distance between the slots (0.10 m), so it does not cover
 // them, and it starts beyond the checkered line (which ends at 0.016 m).
@@ -109,6 +113,15 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
   const centerPoints = centerLane.sample(SAMPLE_SPACING);
   const lanePoints = Object.values(circuit.lanes).map((lane) => lane.sample(SAMPLE_SPACING));
   const finish = centerLane.poseAt(0);
+  // Time and place the boundaries along the driven lane, including curves.
+  const sectorEnds = Array.from({ length: SECTOR_COUNT }, (_, index) => {
+    const pose = context.lane.poseAt(context.laneLength * (index + 1) / SECTOR_COUNT);
+    return {
+      ...pose,
+      x: pose.x + context.lane.offset * Math.sin(pose.heading),
+      y: pose.y - context.lane.offset * Math.cos(pose.heading),
+    };
+  });
   const tireMarks = createTireMarks();
   const boundaries = curveBoundaries(circuit.track);
   const midpoints = sectionMidpoints(circuit.track);
@@ -200,14 +213,12 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
     surface.restore();
   }
 
-  function drawFinishLine(surface, improved = false) {
+  function drawFinishLine(surface) {
     const cell = circuit.trackWidth / CHECKER_CELLS;
     withPose(surface, finish, () => {
       for (let row = 0; row < 2; row += 1) {
         for (let column = 0; column < CHECKER_CELLS; column += 1) {
-          surface.fillStyle = (row + column) % 2 === 0
-            ? (improved ? PALETTE.finishBest : PALETTE.checkerLight)
-            : PALETTE.checkerDark;
+          surface.fillStyle = (row + column) % 2 === 0 ? PALETTE.checkerLight : PALETTE.checkerDark;
           surface.fillRect(
             (row - 1) * CHECKER_DEPTH * scale,
             (-circuit.trackWidth / 2 + column * cell) * scale,
@@ -233,6 +244,24 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
         surface.stroke();
       });
     }
+  }
+
+  /** Fixed, solid sector lines: no flashes, animation or numeric display. */
+  function drawSectorLines(sectors, cumulative) {
+    sectorEnds.forEach((pose, index) => {
+      withPose(surface, pose, () => {
+        // Two separate bands just before the boundary, clear of the checker:
+        // green for the sector, then purple for elapsed time from the start.
+        [sectors[index] ? PALETTE.finishBest : PALETTE.checkerLight,
+          cumulative[index] ? PALETTE.cumulativeBest : PALETTE.checkerLight].forEach((color, row) => {
+          surface.fillStyle = color;
+          surface.fillRect(
+            (-CHECKER_DEPTH - (2 - row) * (SECTOR_LINE_WIDTH + SECTOR_LINE_GAP)) * scale,
+            -circuit.trackWidth * scale / 2, SECTOR_LINE_WIDTH * scale, circuit.trackWidth * scale,
+          );
+        });
+      });
+    });
   }
 
   /**
@@ -415,12 +444,8 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
     if (restarted) tireMarks.reset();
     for (const step of steps) tireMarks.record(step, context);
     drawTireMarks(world.time);
-    // The first valid lap is also a session best. Hold green until another
-    // lap closes, then update it (also if that lap is invalid).
-    const { laps, best } = world.timer;
-    const lastLap = laps.at(-1);
-    const improved = best !== null && lastLap?.number === best.number;
-    drawFinishLine(surface, improved);
+    drawSectorLines(sectorFeedback(world.timer), cumulativeFeedback(world.timer));
+    drawFinishLine(surface);
     drawCar(world);
     if (paused) drawPauseOverlay();
   }
