@@ -223,6 +223,12 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 
+#best-sector-laps {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: var(--page-muted);
+}
+
 .tile .sector-marks {
   display: flex;
   gap: 6px;

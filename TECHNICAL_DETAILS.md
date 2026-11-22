@@ -44,6 +44,12 @@ This is a first playable prototype.
 
 - Circuits built from modular pieces, more than one car, computer-controlled opponents, and races.
 
+Below Best sectors sum, four numbers in sector order show the lap that set each sector
+record, including records from a lap still in progress. These numbers are saved
+with the records and retained on Restart. A dash means no record exists or its
+lap number is unavailable in an older archive. Equal times keep the original
+record and its lap number.
+
 ## Running it
 
 You need [Node.js](https://nodejs.org/) 20 or later (the project is developed and tested with Node 24). It has no dependencies to install.

@@ -54,6 +54,7 @@ async function start() {
     bestLapNumber: document.getElementById('best-lap-number'),
     bestLapSectors: document.getElementById('best-lap-sectors'),
     bestSectorsSum: document.getElementById('best-sectors-sum'),
+    bestSectorLaps: document.getElementById('best-sector-laps'),
     laps: document.getElementById('laps'),
     announcer: document.getElementById('announcer'),
   });

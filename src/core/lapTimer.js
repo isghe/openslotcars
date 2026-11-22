@@ -165,7 +165,10 @@ export function markExit(timer, details = null) {
 /** Records a split only after the start and all preceding sector boundaries. */
 function recordSectorCrossing(timer, time, number) {
   if (timer.lapStart === null || timer.currentSectors.length !== number - 1) return timer;
-  const sector = { number, time: time - timer.sectorStart, valid: !timer.currentSectorHadExit };
+  const sector = {
+    number, time: time - timer.sectorStart, valid: !timer.currentSectorHadExit,
+    lapNumber: timer.laps.length + 1,
+  };
   const best = timer.bestSectors[number - 1];
   const improves = sector.valid && (best === null || sector.time < best.time);
   // Keep the achievement even after a later attempt beats this record.
