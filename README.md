@@ -11,6 +11,8 @@ Press `P` or `Esc` to pause, `R` to restart. Choose a track from the **Circuit**
 Lap and sector times are saved in your browser for each circuit. **Restart**
 keeps them; **Reset…** clears the current circuit's saved times after confirmation.
 
+![OpenSlotCars GUI after seven completed laps, with mixed sector indicators, green and purple track markers, and the car aligned on the straight after leaving red tire marks through the curve, with the throttle held down](docs/screenshot-gui.png)
+
 ## Run locally
 
 Requires Node.js 20 or later. No dependencies to install.
