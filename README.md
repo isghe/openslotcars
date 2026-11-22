@@ -21,6 +21,11 @@ An exit invalidates its sector and the cumulative times for the rest of that
 lap; later clean sectors can still set green records. All references belong
 to the current session and reset on restart, circuit change or page reload.
 
+Use **Show sector feedback** in the top-left menu to show or hide both bands.
+They are shown by default; add `?sector-feedback=0` to the URL to hide them
+(or `&sector-feedback=0` alongside other options). The menu updates the URL,
+so the setting survives a reload and can be shared. Timing continues while hidden.
+
 ## The circuits
 
 There are six circuits. The car runs on the lane named inner, and the length given is that of one lap. On the figure eight, each lane alternates between the inside and outside of the two lobes. Each picture shows the car in a slide, with its tire marks behind it.
