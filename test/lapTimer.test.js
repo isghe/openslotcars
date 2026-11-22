@@ -16,6 +16,33 @@ import {
 
 const L = 6;
 
+test('sector feedback is white without a valid attempt, yellow when slower and green for records and ties', () => {
+  let timer = recordCrossing(createLapTimer(), 0);
+  let time = 0;
+  let distance = 0;
+  const complete = (duration, exit = false) => {
+    if (exit) timer = markExit(timer);
+    ({ timer } = advanceTimer(deepFreeze(timer), {
+      previousTime: time, dt: duration, previousDistance: distance,
+      distance: distance + L / 4, laneLength: L,
+    }));
+    time += duration;
+    distance += L / 4;
+  };
+  assert.deepEqual(sectorFeedback(timer), Array(4).fill('white'));
+  complete(1, true);
+  assert.deepEqual(sectorFeedback(timer), Array(4).fill('white'));
+  for (let i = 0; i < 4; i += 1) complete(2);
+  assert.deepEqual(sectorFeedback(timer), Array(4).fill('green'));
+  for (const duration of [3, 2, 1, 3]) complete(duration);
+  assert.deepEqual(sectorFeedback(timer), ['yellow', 'yellow', 'green', 'green']);
+  // The tied third sector stays green without replacing the record object.
+  assert.notEqual(timer.lastSectors[2], timer.bestSectors[2]);
+  complete(1, true);
+  assert.equal(sectorFeedback(timer)[1], 'white');
+  assert.deepEqual(sectorFeedback(restartLapTimer(timer)), Array(4).fill('white'));
+});
+
 test('green sector records and purple cumulative records are independent', () => {
   let timer = recordCrossing(createLapTimer(), 0);
   let time = 0;
@@ -31,10 +58,10 @@ test('green sector records and purple cumulative records are independent', () =>
   };
   assert.deepEqual(cumulativeFeedback(timer), [false, false, false, false]);
   for (let i = 0; i < 4; i += 1) complete(4);
-  assert.deepEqual(sectorFeedback(timer), [true, true, true, true]);
+  assert.deepEqual(sectorFeedback(timer), ['green', 'green', 'green', 'green']);
   assert.deepEqual(cumulativeFeedback(timer), [true, true, true, true]);
   for (const duration of [6, 3, 2, 4]) complete(duration);
-  assert.deepEqual(sectorFeedback(timer), [false, true, true, false]);
+  assert.deepEqual(sectorFeedback(timer), ['yellow', 'green', 'green', 'green']);
   assert.deepEqual(cumulativeFeedback(timer), [false, false, true, true]);
   assert.deepEqual(timer.lastSplits.map(split => split.time), [6, 9, 11, 15]);
   assert.deepEqual(timer.bestSplits.map(split => split.time), [4, 8, 11, 15]);
@@ -43,7 +70,7 @@ test('green sector records and purple cumulative records are independent', () =>
   complete(1, true);
   complete(1);
   // A later clean sector can set a record after an exit; elapsed times cannot.
-  assert.equal(sectorFeedback(timer)[1], true);
+  assert.equal(sectorFeedback(timer)[1], 'green');
   assert.equal(cumulativeFeedback(timer)[0], false);
   assert.equal(cumulativeFeedback(timer)[1], false);
   assert.deepEqual(timer.bestSplits, bestSplits);
@@ -52,7 +79,7 @@ test('green sector records and purple cumulative records are independent', () =>
 
 test('sector feedback compares each attempt with its own session best and persists between crossings', () => {
   let timer = recordCrossing(createLapTimer(), 0);
-  assert.deepEqual(sectorFeedback(timer), [false, false, false, false]);
+  assert.deepEqual(sectorFeedback(timer), ['white', 'white', 'white', 'white']);
   let time = 0;
   let distance = 0;
   const complete = (duration, exit = false) => {
@@ -65,16 +92,16 @@ test('sector feedback compares each attempt with its own session best and persis
     distance += L / 4;
   };
   for (let i = 0; i < 4; i += 1) complete(2);
-  assert.deepEqual(sectorFeedback(timer), [true, true, true, true]);
+  assert.deepEqual(sectorFeedback(timer), ['green', 'green', 'green', 'green']);
   const bestLap = timer.best;
   complete(3);
-  assert.deepEqual(sectorFeedback(timer), [false, true, true, true]);
+  assert.deepEqual(sectorFeedback(timer), ['yellow', 'green', 'green', 'green']);
   complete(2);
-  assert.deepEqual(sectorFeedback(timer), [false, false, true, true]);
+  assert.deepEqual(sectorFeedback(timer), ['yellow', 'green', 'green', 'green']);
   complete(1, true);
-  assert.deepEqual(sectorFeedback(timer), [false, false, false, true]);
+  assert.deepEqual(sectorFeedback(timer), ['yellow', 'green', 'white', 'green']);
   complete(1);
-  assert.deepEqual(sectorFeedback(timer), [false, false, false, true]);
+  assert.deepEqual(sectorFeedback(timer), ['yellow', 'green', 'white', 'green']);
   assert.equal(timer.best, bestLap);
   assert.deepEqual(timer.bestSectors.map(sector => sector.time), [2, 2, 2, 1]);
   assert.equal(timer.laps[1].valid, false);
@@ -82,7 +109,7 @@ test('sector feedback compares each attempt with its own session best and persis
     previousTime: time, dt: 0.1, previousDistance: distance, distance: distance + 0.1, laneLength: L,
   }).timer;
   assert.equal(between, timer);
-  assert.deepEqual(sectorFeedback(createLapTimer()), [false, false, false, false]);
+  assert.deepEqual(sectorFeedback(createLapTimer()), ['white', 'white', 'white', 'white']);
 });
 
 test('four equal-distance sectors retain individual durations and sum to the lap', () => {
