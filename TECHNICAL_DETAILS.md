@@ -78,14 +78,17 @@ The logic in `src/core/` is pure: it does not touch the page, read a clock or us
 
 ### Circuit display options
 
-Use the top-left **Display options** button to toggle **Show curbs** and
-**Show curve markers** independently. Curbs are the alternating blocks along
+Use the top-left **Display options** button to toggle **Show curbs**,
+**Show curve markers** and **Show sector feedback** independently.
+Sector feedback controls both timing bands at all four sector ends; hiding them
+keeps timing and session records running, and leaves the checkered finish visible.
+Curbs are the alternating blocks along
 the edges of the curves. Curve markers include the thin blue lines at curve
 entrances and exits and the violet midpoint lines described below. Changing
 either option updates the circuit drawing during play or while paused.
 
-The URL parameters are `curbs` and `curve-markers`, for example
-`?circuit=club&curbs=0&curve-markers=1`. Each option is on by default and
+The URL parameters are `curbs`, `curve-markers` and `sector-feedback`, for example
+`?circuit=club&curbs=0&curve-markers=1&sector-feedback=0`. Each option is on by default and
 when its parameter is exactly `1`. Any other value turns it off. When a
 parameter is repeated, its first value counts. The menu updates the current
 address so the options can be reopened or shared.

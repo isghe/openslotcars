@@ -27,9 +27,9 @@ for (const definition of CIRCUITS) {
     let timer = createLapTimer();
     let previousTime = 0;
     let previousDistance = -0.1;
-    const draw = () => {
+    const draw = (options = {}) => {
       drawing.rectangles.length = 0;
-      renderer.draw({ ...createWorld(context), timer }, { steps: [] });
+      renderer.draw({ ...createWorld(context), timer }, { steps: [], ...options });
       return {
         green: drawing.rectangles.filter(rectangle => rectangle.color === '#00ff66').length,
         purple: drawing.rectangles.filter(rectangle => rectangle.color === '#c060ff').length,
@@ -51,6 +51,19 @@ for (const definition of CIRCUITS) {
     renderer.resize();
     renderer.setDisplayOptions({ curbs: true, curveMarkers: true });
     assert.deepEqual(draw(), { green: 4, purple: 4 });
+    const rectanglesWithFeedback = drawing.rectangles.length;
+    renderer.setDisplayOptions({ curbs: true, curveMarkers: true, sectorFeedback: false });
+    assert.deepEqual(draw(), { green: 0, purple: 0 });
+    assert.equal(drawing.rectangles.length, rectanglesWithFeedback - 8);
+    assert.deepEqual(draw({ paused: true }), { green: 0, purple: 0 });
+    renderer.setDisplayOptions({ curbs: true, curveMarkers: true, sectorFeedback: true });
+    assert.deepEqual(draw(), { green: 4, purple: 4 });
+    // A renderer opened with the option off omits all bands from its first draw.
+    const hiddenRenderer = createRenderer(canvas, circuit, context, { sectorFeedback: false });
+    drawing.rectangles.length = 0;
+    hiddenRenderer.draw({ ...createWorld(context), timer }, { steps: [] });
+    assert.equal(drawing.rectangles.length, rectanglesWithFeedback - 8);
+    assert.ok(drawing.rectangles.every(rectangle => !['#00ff66', '#c060ff'].includes(rectangle.color)));
     // Slower attempts clear both bands as each boundary is crossed again.
     for (let boundary = 1; boundary <= 4; boundary += 1) {
       const distance = context.laneLength * (1 + boundary / 4);

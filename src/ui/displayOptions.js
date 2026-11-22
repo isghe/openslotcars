@@ -1,10 +1,11 @@
-const PARAMETERS = { curbs: 'curbs', curveMarkers: 'curve-markers' };
+const PARAMETERS = { curbs: 'curbs', curveMarkers: 'curve-markers', sectorFeedback: 'sector-feedback' };
 
 export function displayOptionsFromSearch(search) {
   const params = new URLSearchParams(search);
   return {
     curbs: (params.get(PARAMETERS.curbs) ?? '1') === '1',
     curveMarkers: (params.get(PARAMETERS.curveMarkers) ?? '1') === '1',
+    sectorFeedback: (params.get(PARAMETERS.sectorFeedback) ?? '1') === '1',
   };
 }
 

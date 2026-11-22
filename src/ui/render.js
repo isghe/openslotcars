@@ -100,9 +100,11 @@ const CURB_BLOCK_LENGTH = 0.20;
  * @param {HTMLCanvasElement} canvas Canvas to draw on.
  * @param {{track: object, trackWidth: number, lanes: Object<string, object>}} circuit
  * @param {object} context Simulation context (see `createContext`).
- * @param {{curveMarkers?: boolean, curbs?: boolean}} options Initial display options.
+ * @param {{curveMarkers?: boolean, curbs?: boolean, sectorFeedback?: boolean}} options Initial display options.
  */
-export function createRenderer(canvas, circuit, context, { curveMarkers = false, curbs = false } = {}) {
+export function createRenderer(canvas, circuit, context, {
+  curveMarkers = false, curbs = false, sectorFeedback: showSectorFeedback = true,
+} = {}) {
   const surface = canvas.getContext('2d');
   if (surface === null) throw new Error('the canvas has no 2D drawing context');
   const staticCanvas = canvas.ownerDocument.createElement('canvas');
@@ -413,7 +415,11 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
     for (const points of lanePoints) strokePath(surface, points, PALETTE.slot, SLOT_WIDTH);
   }
 
-  function setDisplayOptions({ curbs: showCurbs, curveMarkers: showCurveMarkers }) {
+  function setDisplayOptions({
+    curbs: showCurbs, curveMarkers: showCurveMarkers,
+    sectorFeedback: nextSectorFeedback = showSectorFeedback,
+  }) {
+    showSectorFeedback = nextSectorFeedback;
     if (curbs === showCurbs && curveMarkers === showCurveMarkers) return;
     curbs = showCurbs;
     curveMarkers = showCurveMarkers;
@@ -444,7 +450,7 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
     if (restarted) tireMarks.reset();
     for (const step of steps) tireMarks.record(step, context);
     drawTireMarks(world.time);
-    drawSectorLines(sectorFeedback(world.timer), cumulativeFeedback(world.timer));
+    if (showSectorFeedback) drawSectorLines(sectorFeedback(world.timer), cumulativeFeedback(world.timer));
     drawFinishLine(surface);
     drawCar(world);
     if (paused) drawPauseOverlay();

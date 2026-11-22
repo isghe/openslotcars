@@ -21,6 +21,7 @@ const displayOptions = displayOptionsFromSearch(window.location.search);
 const displayCheckboxes = {
   curbs: document.getElementById('show-curbs'),
   curveMarkers: document.getElementById('show-curve-markers'),
+  sectorFeedback: document.getElementById('show-sector-feedback'),
 };
 for (const [option, checkbox] of Object.entries(displayCheckboxes)) {
   checkbox.checked = displayOptions[option];
