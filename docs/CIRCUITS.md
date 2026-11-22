@@ -1,6 +1,6 @@
 # The circuits
 
-There are six circuits. The car runs on the lane named inner, and the length given is that of one lap. On the figure eight, each lane alternates between the inside and outside of the two lobes. Each picture shows the car in a slide, with its tire marks behind it.
+There are six circuits. The car runs on the lane named inner, and the length given is that of one lap. On Infinite Loop, each lane alternates between the inside and outside of the two lobes. Each picture shows the car in a slide, with its tire marks behind it.
 
 ## Oval
 
