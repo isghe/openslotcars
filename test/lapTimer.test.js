@@ -9,9 +9,140 @@ import {
   advanceTimer,
   currentLapTime,
   formatLapTime,
+  sectorFeedback,
+  cumulativeFeedback,
 } from '../src/core/lapTimer.js';
 
 const L = 6;
+
+test('green sector records and purple cumulative records are independent', () => {
+  let timer = recordCrossing(createLapTimer(), 0);
+  let time = 0;
+  let distance = 0;
+  const complete = (duration, exit = false) => {
+    if (exit) timer = markExit(timer);
+    ({ timer } = advanceTimer(deepFreeze(timer), {
+      previousTime: time, dt: duration, previousDistance: distance,
+      distance: distance + L / 4, laneLength: L,
+    }));
+    time += duration;
+    distance += L / 4;
+  };
+  assert.deepEqual(cumulativeFeedback(timer), [false, false, false, false]);
+  for (let i = 0; i < 4; i += 1) complete(4);
+  assert.deepEqual(sectorFeedback(timer), [true, true, true, true]);
+  assert.deepEqual(cumulativeFeedback(timer), [true, true, true, true]);
+  for (const duration of [6, 3, 2, 4]) complete(duration);
+  assert.deepEqual(sectorFeedback(timer), [false, true, true, false]);
+  assert.deepEqual(cumulativeFeedback(timer), [false, false, true, true]);
+  assert.deepEqual(timer.lastSplits.map(split => split.time), [6, 9, 11, 15]);
+  assert.deepEqual(timer.bestSplits.map(split => split.time), [4, 8, 11, 15]);
+  assert.equal(timer.bestSplits[3].time, timer.best.time);
+  const bestSplits = timer.bestSplits;
+  complete(1, true);
+  complete(1);
+  // A later clean sector can set a record after an exit; elapsed times cannot.
+  assert.equal(sectorFeedback(timer)[1], true);
+  assert.equal(cumulativeFeedback(timer)[0], false);
+  assert.equal(cumulativeFeedback(timer)[1], false);
+  assert.deepEqual(timer.bestSplits, bestSplits);
+  assert.deepEqual(cumulativeFeedback(createLapTimer()), [false, false, false, false]);
+});
+
+test('sector feedback compares each attempt with its own session best and persists between crossings', () => {
+  let timer = recordCrossing(createLapTimer(), 0);
+  assert.deepEqual(sectorFeedback(timer), [false, false, false, false]);
+  let time = 0;
+  let distance = 0;
+  const complete = (duration, exit = false) => {
+    if (exit) timer = markExit(timer);
+    ({ timer } = advanceTimer(deepFreeze(timer), {
+      previousTime: time, dt: duration, previousDistance: distance,
+      distance: distance + L / 4, laneLength: L,
+    }));
+    time += duration;
+    distance += L / 4;
+  };
+  for (let i = 0; i < 4; i += 1) complete(2);
+  assert.deepEqual(sectorFeedback(timer), [true, true, true, true]);
+  const bestLap = timer.best;
+  complete(3);
+  assert.deepEqual(sectorFeedback(timer), [false, true, true, true]);
+  complete(2);
+  assert.deepEqual(sectorFeedback(timer), [false, false, true, true]);
+  complete(1, true);
+  assert.deepEqual(sectorFeedback(timer), [false, false, false, true]);
+  complete(1);
+  assert.deepEqual(sectorFeedback(timer), [false, false, false, true]);
+  assert.equal(timer.best, bestLap);
+  assert.deepEqual(timer.bestSectors.map(sector => sector.time), [2, 2, 2, 1]);
+  assert.equal(timer.laps[1].valid, false);
+  const between = advanceTimer(timer, {
+    previousTime: time, dt: 0.1, previousDistance: distance, distance: distance + 0.1, laneLength: L,
+  }).timer;
+  assert.equal(between, timer);
+  assert.deepEqual(sectorFeedback(createLapTimer()), [false, false, false, false]);
+});
+
+test('four equal-distance sectors retain individual durations and sum to the lap', () => {
+  let timer = recordCrossing(createLapTimer(), 0);
+  let time = 0;
+  for (let sector = 1; sector <= 4; sector += 1) {
+    const before = deepFreeze(timer);
+    ({ timer } = advanceTimer(before, {
+      previousTime: time, dt: sector,
+      previousDistance: (sector - 1) * L / 4, distance: sector * L / 4, laneLength: L,
+    }));
+    time += sector;
+    assert.equal(timer.laps.length, sector === 4 ? 1 : 0);
+    assert.equal(timer.currentSectors.length, sector % 4);
+  }
+  assert.deepEqual(timer.laps[0].sectors, [1, 2, 3, 4].map(number => ({
+    number, time: number, valid: true,
+  })));
+  near(timer.laps[0].sectors.reduce((sum, sector) => sum + sector.time, 0), timer.laps[0].time);
+});
+
+test('one step can start timing and close all four sectors without counting the approach', () => {
+  const { timer } = advanceTimer(createLapTimer(), {
+    previousTime: 0, dt: 9, previousDistance: -1, distance: 8, laneLength: 8,
+  });
+  near(timer.laps[0].time, 8);
+  assert.deepEqual(timer.laps[0].sectors.map(sector => sector.time), [2, 2, 2, 2]);
+  assert.equal(timer.sectorStart, 9);
+  assert.deepEqual(timer.currentSectors, []);
+});
+
+test('a sector boundary is timed once, even if the car then stops on it', () => {
+  let timer = recordCrossing(createLapTimer(), 0);
+  ({ timer } = advanceTimer(timer, {
+    previousTime: 0, dt: 1, previousDistance: 0, distance: L / 4, laneLength: L,
+  }));
+  const stopped = advanceTimer(timer, {
+    previousTime: 1, dt: 5, previousDistance: L / 4, distance: L / 4, laneLength: L,
+  });
+  assert.equal(stopped.timer, timer);
+  ({ timer } = advanceTimer(timer, {
+    previousTime: 6, dt: 1, previousDistance: L / 4, distance: L / 2, laneLength: L,
+  }));
+  assert.deepEqual(timer.currentSectors.map(sector => sector.time), [1, 6]);
+});
+
+test('an exit invalidates its sector and lap, while the next sector is clean', () => {
+  let timer = recordCrossing(createLapTimer(), 0);
+  for (let sector = 1; sector <= 4; sector += 1) {
+    if (sector === 2) timer = markExit(timer);
+    ({ timer } = advanceTimer(timer, {
+      previousTime: sector - 1, dt: 1,
+      previousDistance: (sector - 1) * L / 4, distance: sector * L / 4, laneLength: L,
+    }));
+  }
+  assert.equal(timer.laps[0].valid, false);
+  assert.deepEqual(timer.laps[0].sectors.map(sector => sector.valid), [true, false, true, true]);
+  assert.equal(timer.best, null);
+  assert.equal(timer.currentSectorHadExit, false);
+  assert.deepEqual(createLapTimer().currentSectors, []);
+});
 
 function near(actual, expected, tolerance = 1e-9, message = '') {
   assert.ok(
