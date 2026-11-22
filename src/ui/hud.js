@@ -22,10 +22,10 @@ function setText(element, text) {
 
 /**
  * @param {{currentLap: HTMLElement, lastLap: HTMLElement, bestLap: HTMLElement,
- *   bestLapSectors: HTMLElement, bestSectorsSum: HTMLElement,
+ *   bestLapNumber: HTMLElement, bestLapSectors: HTMLElement, bestSectorsSum: HTMLElement,
  *   laps: HTMLElement, announcer: HTMLElement}} elements
  */
-export function createHud({ currentLap, lastLap, bestLap, bestLapSectors, bestSectorsSum, laps, announcer }) {
+export function createHud({ currentLap, lastLap, bestLap, bestLapNumber, bestLapSectors, bestSectorsSum, laps, announcer }) {
   let shown = null;
 
   return {
@@ -35,6 +35,7 @@ export function createHud({ currentLap, lastLap, bestLap, bestLapSectors, bestSe
       setText(currentLap, texts.currentLap);
       setText(lastLap, texts.lastLap);
       setText(bestLap, texts.bestLap);
+      setText(bestLapNumber, world.timer.best === null ? '' : ` #${world.timer.best.number}`);
       const colors = bestLapSectorColors(world.timer);
       colors.forEach((color, index) => {
         const mark = bestLapSectors.children[index];
