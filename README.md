@@ -4,7 +4,7 @@ A slot car racing simulator that runs in your browser, with six circuits, slidin
 
 ![A yellow slot car sliding through a curve and leaving tire marks](docs/screenshot.png)
 
-**[Play online](https://isghe.github.io/openslotcars/)**
+<a href="https://isghe.github.io/openslotcars/" target="_blank" rel="noopener noreferrer">https://isghe.github.io/openslotcars/</a>
 
 Hold `Space`, `Arrow Up` or the **Throttle** button to accelerate; release to brake.
 Press `P` or `Esc` to pause, `R` to restart. Choose a track from the **Circuit** menu.
