@@ -1,5 +1,20 @@
 # OpenSlotCars
 
+## Table of contents
+
+- [Status](#status)
+- [Running it](#running-it)
+  - [Controls](#controls)
+  - [Tests](#tests)
+- [How it works](#how-it-works)
+- [Circuit data](#circuit-data)
+  - [Circuit display options](#circuit-display-options)
+  - [Definition format](#definition-format)
+  - [Construction notes](#construction-notes)
+- [Project layout](#project-layout)
+- [Publishing on GitHub Pages](#publishing-on-github-pages)
+- [License](#license)
+
 **OpenSlotCars** is an open source project for simulating slot car racing on electric tracks, running entirely in the browser.
 
 The simulator uses a two-dimensional top-down view and reproduces the behavior of small cars bound to the lanes of a circuit, modeling acceleration, braking, friction, centrifugal force, a tail that slides out in curves and the possibility of leaving the track.
