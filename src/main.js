@@ -94,7 +94,10 @@ async function start() {
   startCircuit(firstCircuit);
   hud.update(game.world);
   bindInput({ controls, throttleButton, pauseButton, restartButton });
-  resetTimesButton.addEventListener('click', () => {
+  resetTimesButton.addEventListener('click', (event) => {
+    // Pointer clicks return focus to the track before the dialog can restore it.
+    // Keyboard activation keeps focus on the button, like Pause and Restart.
+    if (event.detail !== 0) resetTimesButton.blur();
     const lapCount = game.world.timer.laps.length;
     const lapLabel = lapCount === 1 ? 'lap' : 'laps';
     if (!window.confirm(`Reset all saved lap and sector times for ${activeCircuit.name}? ${lapCount} ${lapLabel} will be deleted. This cannot be undone.`)) return;
