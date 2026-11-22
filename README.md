@@ -10,6 +10,11 @@ A slot car racing simulator that runs in your browser. Keep the throttle down th
 
 Hold `Space` (or the **Throttle** button on a touch screen) to accelerate and release it to brake. Too fast in a curve and the tail slides out; much too fast and the car leaves the track. Try to set the best lap time, on the oval or on one of the other circuits in the **Circuit** menu below the track. To open a circuit directly, add its name to the address, for example [`?circuit=chicane`](https://isghe.github.io/openslotcars/?circuit=chicane).
 
+The finish line turns steady green when you improve the session's best valid
+lap, and stays green until the next lap is completed. The first valid lap also
+turns it green; slower, equal or invalid laps leave the line black and white.
+Restarting or changing circuit clears the reference.
+
 ## The circuits
 
 There are six circuits. The car runs on the lane named inner, and the length given is that of one lap. On the figure eight, each lane alternates between the inside and outside of the two lobes. Each picture shows the car in a slide, with its tire marks behind it.

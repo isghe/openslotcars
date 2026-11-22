@@ -25,6 +25,7 @@ const PALETTE = Object.freeze({
   slot: '#9aa3ad',
   checkerLight: '#ffffff',
   checkerDark: '#000000',
+  finishBest: '#00ff66',
   carBody: '#ffd400',
   carOffTrack: '#ff0000',
   carOutline: '#000000',
@@ -199,12 +200,14 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
     surface.restore();
   }
 
-  function drawFinishLine(surface) {
+  function drawFinishLine(surface, improved = false) {
     const cell = circuit.trackWidth / CHECKER_CELLS;
     withPose(surface, finish, () => {
       for (let row = 0; row < 2; row += 1) {
         for (let column = 0; column < CHECKER_CELLS; column += 1) {
-          surface.fillStyle = (row + column) % 2 === 0 ? PALETTE.checkerLight : PALETTE.checkerDark;
+          surface.fillStyle = (row + column) % 2 === 0
+            ? (improved ? PALETTE.finishBest : PALETTE.checkerLight)
+            : PALETTE.checkerDark;
           surface.fillRect(
             (row - 1) * CHECKER_DEPTH * scale,
             (-circuit.trackWidth / 2 + column * cell) * scale,
@@ -379,7 +382,6 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
       drawReferenceLines(surface, midpoints, PALETTE.sectionMidpoint);
     }
     for (const points of lanePoints) strokePath(surface, points, PALETTE.slot, SLOT_WIDTH);
-    drawFinishLine(surface);
   }
 
   function setDisplayOptions({ curbs: showCurbs, curveMarkers: showCurveMarkers }) {
@@ -413,6 +415,12 @@ export function createRenderer(canvas, circuit, context, { curveMarkers = false,
     if (restarted) tireMarks.reset();
     for (const step of steps) tireMarks.record(step, context);
     drawTireMarks(world.time);
+    // The first valid lap is also a session best. Hold green until another
+    // lap closes, then update it (also if that lap is invalid).
+    const { laps, best } = world.timer;
+    const lastLap = laps.at(-1);
+    const improved = best !== null && lastLap?.number === best.number;
+    drawFinishLine(surface, improved);
     drawCar(world);
     if (paused) drawPauseOverlay();
   }
