@@ -27,6 +27,7 @@ const PALETTE = Object.freeze({
   checkerLight: '#ffffff',
   checkerDark: '#000000',
   finishBest: '#00ff66',
+  sectorSlower: '#ffd400',
   cumulativeBest: '#c060ff',
   carBody: '#ffd400',
   carOffTrack: '#ff0000',
@@ -253,8 +254,9 @@ export function createRenderer(canvas, circuit, context, {
     sectorEnds.forEach((pose, index) => {
       withPose(surface, pose, () => {
         // A pair of squares on each side, just before the boundary:
-        // green for the sector, then purple for elapsed time from the start.
-        [sectors[index] ? PALETTE.finishBest : PALETTE.checkerLight,
+        // Sector: green for a best time, yellow if slower, white if unavailable.
+        // Then purple for a record elapsed time from the start.
+        [{ green: PALETTE.finishBest, yellow: PALETTE.sectorSlower, white: PALETTE.checkerLight }[sectors[index]],
           cumulative[index] ? PALETTE.cumulativeBest : PALETTE.checkerLight].forEach((color, row) => {
           surface.fillStyle = color;
           const offset = circuit.trackWidth / 2 + EDGE_WIDTH + CURB_WIDTH + SECTOR_MARK_GAP;

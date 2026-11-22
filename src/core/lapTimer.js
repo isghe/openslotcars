@@ -185,10 +185,12 @@ function recordSectorCrossing(timer, time, number) {
   };
 }
 
-/** Steady-green states for the last completed attempt at each sector. */
+/** Colors for the last sector attempt: white if unavailable or invalid, green for a best time, yellow if slower. */
 export function sectorFeedback(timer) {
-  return timer.lastSectors.map((sector, index) => sector !== null
-    && sector.valid && sector === timer.bestSectors[index]);
+  return timer.lastSectors.map((sector, index) => {
+    if (sector === null || !sector.valid) return 'white';
+    return sector.time === timer.bestSectors[index]?.time ? 'green' : 'yellow';
+  });
 }
 
 /** Steady-purple states for cumulative session records at each boundary. */
