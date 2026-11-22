@@ -9,7 +9,7 @@
  *   steps, and the throttle ramp of the controls advances once per step;
  * - while the game is paused no time passes: the world does not change, and the
  *   time spent in pause is not made up for when the game resumes;
- * - a restart starts a new world and also ends the pause.
+ * - a restart resets the car and current attempt, retains timing records and ends the pause.
  *
  * This module is pure logic: it never reads a clock, the caller passes the
  * time of each frame.
@@ -17,14 +17,15 @@
 
 import { createWorld, stepWorld, interpolateWorld } from './simulation.js';
 import { createStepper } from './stepper.js';
+import { createLapTimer, restartLapTimer } from './lapTimer.js';
 
 /**
- * @param {{context: object, controls: object}} options `context` comes from
+ * @param {{context: object, controls: object, initialTimer?: object}} options `context` comes from
  *   `createContext`; `controls` from `createControls`.
  */
-export function createGame({ context, controls }) {
+export function createGame({ context, controls, initialTimer = createLapTimer() }) {
   const stepper = createStepper({ dt: context.dt });
-  let world = createWorld(context);
+  let world = { ...createWorld(context), timer: restartLapTimer(initialTimer) };
   let previous = world;
   let lastFrameTime = null;
 
@@ -47,7 +48,7 @@ export function createGame({ context, controls }) {
 
       const restarted = controls.takeRestart();
       if (restarted) {
-        world = createWorld(context);
+        world = { ...createWorld(context), timer: restartLapTimer(world.timer) };
         previous = world;
         stepper.reset();
         controls.resetThrottle();

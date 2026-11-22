@@ -8,6 +8,7 @@
 
 import { buildCircuit } from './core/circuits.js';
 import { loadCircuits } from './data/loadCircuits.js';
+import { createTimingStorage } from './data/timingStorage.js';
 import { createControls } from './core/controls.js';
 import { createGame } from './core/game.js';
 import { createContext } from './core/simulation.js';
@@ -44,11 +45,13 @@ async function start() {
   const pauseButton = document.getElementById('pause');
   const restartButton = document.getElementById('restart');
   const circuitSelect = document.getElementById('circuit');
+  const resetTimesButton = document.getElementById('reset-times');
 
   const hud = createHud({
     currentLap: document.getElementById('current-lap'),
     lastLap: document.getElementById('last-lap'),
     bestLap: document.getElementById('best-lap'),
+    bestLapNumber: document.getElementById('best-lap-number'),
     bestLapSectors: document.getElementById('best-lap-sectors'),
     bestSectorsSum: document.getElementById('best-sectors-sum'),
     laps: document.getElementById('laps'),
@@ -59,12 +62,25 @@ async function start() {
 
   let game;
   let renderer;
+  let timingStorage;
+  let activeCircuit;
+  const timingArchives = new Map();
 
   /** Builds the circuit, the car on it and the drawing, and shows its name. */
   function startCircuit(definition) {
     const circuit = buildCircuit(definition);
     const context = createContext({ lane: circuit.lanes.inner });
-    game = createGame({ context, controls });
+    activeCircuit = definition;
+    if (!timingArchives.has(definition.id)) {
+      timingArchives.set(definition.id, createTimingStorage({
+        getStorage: () => window.localStorage,
+        circuitId: definition.id,
+        signature: JSON.stringify({ definition, params: context.params,
+          dt: context.dt, tailSlide: context.tailSlide, recoverySteps: context.recoverySteps }),
+      }));
+    }
+    timingStorage = timingArchives.get(definition.id);
+    game = createGame({ context, controls, initialTimer: timingStorage.load() });
     renderer = createRenderer(canvas, circuit, context, displayOptions);
     document.title = `OpenSlotCars - ${circuit.name}`;
     canvas.setAttribute(
@@ -79,6 +95,22 @@ async function start() {
   startCircuit(firstCircuit);
   hud.update(game.world);
   bindInput({ controls, throttleButton, pauseButton, restartButton });
+  resetTimesButton.addEventListener('click', (event) => {
+    // Pointer clicks return focus to the track before the dialog can restore it.
+    // Keyboard activation keeps focus on the button, like Pause and Restart.
+    if (event.detail !== 0) resetTimesButton.blur();
+    const lapCount = game.world.timer.laps.length;
+    const lapLabel = lapCount === 1 ? 'lap' : 'laps';
+    if (!window.confirm(`Reset all saved lap and sector times for ${activeCircuit.name}? ${lapCount} ${lapLabel} will be deleted. This cannot be undone.`)) return;
+    if (!timingStorage.clear()) {
+      document.getElementById('announcer').textContent = 'Unable to reset saved times. Please check browser storage permissions.';
+      return;
+    }
+    startCircuit(activeCircuit);
+    controls.resetThrottle();
+    controls.setPaused(false);
+    hud.restart(game.world, `Lap and sector times reset for ${activeCircuit.name}.`);
+  });
   if (document.hidden) controls.setPaused(true);
 
   for (const [option, checkbox] of Object.entries(displayCheckboxes)) {
@@ -134,6 +166,7 @@ async function start() {
 
   function frame(now) {
     const result = game.frame(now);
+    timingStorage.save(result.world.timer);
     if (result.restarted) hud.restart(result.world);
     syncButtons();
 

@@ -31,14 +31,14 @@ This is a first playable prototype.
 
 **Works today**
 
-- Six circuits, chosen from a menu: an oval, a rounded rectangle (speedway), an oval with an S-bend of two long, tight curves on the first straight, two half turns, the first tightening and the second widening, and a long, fast return straight (the chicane, driven clockwise), a teardrop with a hairpin and a rounded L with a wide first curve and a left turn in its reentrant corner (Club, also driven clockwise), and a horizontal figure eight with a ground-level crossing. Each has an inner and an outer lane (the car runs on the inner one). Choosing another circuit starts a new race. The address can choose the circuit the page opens on: `?circuit=oval`, `speedway`, `chicane`, `teardrop`, `club` or `infinite-loop` (the case and the spaces around the name do not matter; a missing or unknown name gives the oval). Choosing a circuit from the menu rewrites the argument in the address (the entry of the history is replaced, not added), so reloading the page or sharing the address brings the circuit back. The lap times are those of the session and are not kept between circuits or page loads.
+- Six circuits, chosen from a menu: an oval, a rounded rectangle (speedway), an oval with an S-bend of two long, tight curves on the first straight, two half turns, the first tightening and the second widening, and a long, fast return straight (the chicane, driven clockwise), a teardrop with a hairpin and a rounded L with a wide first curve and a left turn in its reentrant corner (Club, also driven clockwise), and a horizontal figure eight with a ground-level crossing. Each has an inner and an outer lane (the car runs on the inner one). Choosing another circuit starts a new race. The address can choose the circuit the page opens on: `?circuit=oval`, `speedway`, `chicane`, `teardrop`, `club` or `infinite-loop` (the case and the spaces around the name do not matter; a missing or unknown name gives the oval). Choosing a circuit from the menu rewrites the argument in the address (the entry of the history is replaced, not added), so reloading the page or sharing the address brings the circuit back. Completed laps and sector records are kept separately for each circuit in browser localStorage and restored on later visits.
 - One car with a throttle, motor braking, friction and air drag.
 - A car with a guide pin that follows the lane and a body that pivots about it. Going too fast in a curve makes the tail slide out, which costs speed; going much too fast turns the body so far that the car leaves the track, slides a short way, and is put back on its lane after a pause. The values of the body (distances, inertia, damping, spin-out angle) are estimates for a 1:32 car, not measurements.
 - At release, the body keeps its angular velocity. Off the track it rotates about its center of mass, independently of the distance slid, while friction slows it to rest. Rotational damping grows as sliding speed falls: torque per unit mass is `offTrackFrictionTorque / (1 + speed / offTrackRotationSpeed)`, with a low-speed torque limit of 0.32 m^2/s^2 and a half-torque speed of 1 m/s. When translational speed reaches zero, angular velocity is also set to zero and the angle stays fixed until recovery. These are calibration estimates, rather than a tire contact model. Angular deceleration is that torque divided by `bodyRadiusOfGyration` squared, so residual spin settles quickly near rest. Translation still follows the lane tangent with the existing sliding deceleration. With the sliding-body rule disabled, the point model retains its visual spin.
 - Marks that the rear tires leave on the track while the tail slides, stronger the harder the tail slides, turning from light grey to red towards the spin-out, and fading out after about four seconds.
-- Lap timing with four equal-distance sectors along the driven lane. Each lap records four individual sector durations, with interpolated boundary crossing times. Each sector end has two fixed bands: green for a new best valid sector duration, purple for a new best valid cumulative time since the finish line. At the finish, the purple band reports the complete lap record. The first valid attempt establishes each record and activates both bands. Bands update independently, otherwise return to white, and hold until the next completion of that sector, without flashing. An exit invalidates its sector and all cumulative times for the remainder of that lap; later clean sectors can still set sector records. Restarting, changing circuit or reloading clears all references.
+- Lap timing with four equal-distance sectors along the driven lane. Each lap records four individual sector durations, with interpolated boundary crossing times. Each sector end has two fixed bands: green for a new best valid sector duration, purple for a new best valid cumulative time since the finish line. At the finish, the purple band reports the complete lap record. The first valid attempt establishes each record and activates both bands. Bands update independently, otherwise return to white, and hold until the next completion of that sector, without flashing. An exit invalidates its sector and all cumulative times for the remainder of that lap; later clean sectors can still set sector records. Restarting, changing circuit or reloading starts a fresh attempt and clears the track feedback bands while retaining saved laps and records.
 - Keyboard and touch controls, pause and restart.
-- An accessible timing panel, with events announced in a polite live region. Best sectors sum shows the sum of the four session-best valid sector durations, even when set on different laps. It appears once all four sectors have a valid record, updates whenever a sector improves, and clears on restart or circuit change. Four marks below Best lap describe each individual sector: purple for a time matching the current session record (including ties), green for a sector that set a record when completed but has since been beaten, yellow for a timed sector that did not establish a record, and white when no sector time is available. Each recorded sector retains whether it established a new record; merely tying a record does not establish one. The marks update when records change, even if the best lap stays the same, and reset to white on restart or circuit change. A tooltip and accessible label name each sector's color.
+- An accessible timing panel, with events announced in a polite live region. Best sectors sum shows the sum of the four session-best valid sector durations, even when set on different laps. It appears once all four sectors have a valid record, updates whenever a sector improves, and is restored with the saved records. Four marks below Best lap describe each individual sector: purple for a time matching the current session record (including ties), green for a sector that set a record when completed but has since been beaten, yellow for a timed sector that did not establish a record, and white when no sector time is available. Each recorded sector retains whether it established a new record; merely tying a record does not establish one. The marks update when records change, even if the best lap stays the same, and are restored with the best lap. Resetting saved times returns the marks to white. A tooltip and accessible label name each sector's color.
 
 **Planned**
 
@@ -63,11 +63,39 @@ Browsers refuse to load ES modules from `file://` pages, so opening `index.html`
 | Accelerate | Hold `Space` or `↑` | Hold the **Throttle** button |
 | Brake | Release the key | Release the button |
 | Pause or resume | `P` or `Esc` | **Pause** button |
-| Restart | `R` | **Restart** button |
+| Restart, keeping saved times | `R` | **Restart** button |
+| Clear the current circuit's saved times, with confirmation | — | **Reset…** button |
 
 The throttle rises gradually while the key is held, in 0.4 seconds from nothing to full, and drops to zero as soon as it is released. A short tap therefore gives a partial throttle. At full throttle the car is too fast for the curves, so the way to a good lap is to dose the throttle.
 
 The game pauses by itself when the window loses the focus or the page is hidden.
+
+Timing archives use `openslotcars:timing:v1:<circuit-id>` in localStorage. They
+contain completed laps (including invalid ones and their sectors), individual
+sector records, cumulative records and the sector record history used by the
+colored marks. Each newly completed lap also stores an `exits` array: each
+entry contains `time` in seconds since that lap started, `distance` in meters
+from the finish line along the driven lane, and `sector` numbered 1 through 4.
+Exits are detected at the end of a simulation step, without interpolating the
+instant when grip was lost. Several exits in one lap are kept in order; the
+off-track recovery steps do not add duplicate events. Old invalid laps without
+exit details keep `exits: null`; their locations and times cannot be recovered.
+Clean laps have an empty array. Exit details are saved with the completed lap,
+so an unfinished lap's events are discarded on restart or page reload.
+New timing results are saved at sector boundaries, rather than
+on every animation frame. The car position and unfinished lap are not restored.
+Restart keeps these archives; Reset asks for confirmation before deleting the
+current circuit's archive and resetting its car and timing panel. Other circuits
+are unaffected. Reloading, revisiting a circuit or reopening the site restores
+its compatible archive. Circuit geometry and physics settings are part of the
+archive signature; incompatible or malformed archives are ignored.
+
+The data stays in that browser profile and site origin, so another browser,
+device, hostname or port has a separate history. Clearing browser site data
+also removes the archives. If storage access is denied or its quota is full,
+driving continues with in-memory records for the current visit; failed writes
+are not persisted. If Reset cannot remove the saved archive, it leaves the
+current times intact and reports the failure.
 
 ### Tests
 

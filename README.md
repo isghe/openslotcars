@@ -8,6 +8,8 @@ A slot car racing simulator that runs in your browser, with six circuits, slidin
 
 Hold `Space`, `Arrow Up` or the **Throttle** button to accelerate; release to brake.
 Press `P` or `Esc` to pause, `R` to restart. Choose a track from the **Circuit** menu.
+Lap and sector times are saved in your browser for each circuit. **Restart**
+keeps them; **Reset…** clears the current circuit's saved times after confirmation.
 
 ## Run locally
 

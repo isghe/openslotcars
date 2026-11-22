@@ -9,6 +9,7 @@ function setup() {
     currentLap: { textContent: '' },
     lastLap: { textContent: '' },
     bestLap: { textContent: '' },
+    bestLapNumber: { textContent: '' },
     bestLapSectors: {
       children: Array.from({ length: 4 }, () => ({ dataset: {} })),
       getAttribute(name) { return this[name]; },

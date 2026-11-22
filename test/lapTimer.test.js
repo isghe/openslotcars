@@ -6,6 +6,7 @@ import {
   crossingTime,
   recordCrossing,
   markExit,
+  restartLapTimer,
   advanceTimer,
   currentLapTime,
   formatLapTime,
@@ -230,6 +231,33 @@ test('an exit before the clock starts is ignored', () => {
   timer = recordCrossing(timer, 0);
   timer = recordCrossing(timer, 5);
   assert.equal(timer.laps[0].valid, true);
+});
+
+test('exit details belong to their lap and reset for the next attempt', () => {
+  let timer = recordCrossing(createLapTimer(), 10);
+  ({ timer } = advanceTimer(timer, {
+    previousTime: 10, dt: 1, previousDistance: 0, distance: 1, laneLength: 4,
+  }));
+  timer = markExit(deepFreeze(timer), { time: 11.5, distance: 5.5, laneLength: 4 });
+  ({ timer } = advanceTimer(timer, {
+    previousTime: 11, dt: 1, previousDistance: 1, distance: 2, laneLength: 4,
+  }));
+  timer = markExit(deepFreeze(timer), { time: 12.5, distance: 6.5, laneLength: 4 });
+  ({ timer } = advanceTimer(timer, {
+    previousTime: 12, dt: 2, previousDistance: 2, distance: 4, laneLength: 4,
+  }));
+  assert.deepEqual(timer.laps[0].exits, [
+    { time: 1.5, distance: 1.5, sector: 2 },
+    { time: 2.5, distance: 2.5, sector: 3 },
+  ]);
+  assert.deepEqual(timer.currentExits, []);
+  const exited = markExit(timer, { time: 14.25, distance: 8.25, laneLength: 4 });
+  assert.deepEqual(exited.currentExits, [{ time: 0.25, distance: 0.25, sector: 1 }]);
+  assert.deepEqual(restartLapTimer(exited).currentExits, []);
+  assert.deepEqual(restartLapTimer(exited).laps, timer.laps);
+  const completed = recordCrossing(exited, 18);
+  assert.deepEqual(completed.laps[1].exits, [{ time: 0.25, distance: 0.25, sector: 1 }]);
+  assert.equal(markExit(createLapTimer(), { time: 0, distance: -0.1, laneLength: 4 }).lapStart, null);
 });
 
 test('several exits in the same lap still invalidate only that lap', () => {

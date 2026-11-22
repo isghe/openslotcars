@@ -5,9 +5,37 @@ import { createContext } from '../src/core/simulation.js';
 import { createControls } from '../src/core/controls.js';
 import { createGame } from '../src/core/game.js';
 import { timingSummary } from '../src/core/timing.js';
+import { createLapTimer, recordCrossing, advanceTimer } from '../src/core/lapTimer.js';
 
 const context = createContext({ lane: buildCircuit(OVAL).lanes.inner });
 const FRAME_MS = 1000 / 60;
+
+test('loading and restarting retain timing history while resetting the car and current attempt', () => {
+  const initialTimer = advanceTimer(recordCrossing(createLapTimer(), 0), {
+    previousTime: 0, dt: 8, previousDistance: 0, distance: 4, laneLength: 4,
+  }).timer;
+  const controls = createControls();
+  const game = createGame({ context, controls, initialTimer });
+  assert.equal(game.world.timer.lapStart, null);
+  assert.equal(game.world.timer.best.time, 8);
+  assert.equal(game.world.timer.laps.length, 1);
+  game.frame(0);
+  controls.keyDown('Space');
+  for (let i = 1; i <= 60; i += 1) game.frame(i * FRAME_MS);
+  assert.notEqual(game.world.timer.lapStart, null);
+  const before = game.world.timer;
+  controls.keyUp('Space');
+  controls.keyDown('KeyR');
+  const result = game.frame(61 * FRAME_MS);
+  assert.equal(result.restarted, true);
+  assert.equal(result.world.timer.lapStart, null);
+  assert.equal(result.world.timer.laps, before.laps);
+  assert.equal(result.world.timer.best, before.best);
+  assert.equal(result.world.timer.bestSectors, before.bestSectors);
+  assert.equal(result.world.timer.bestSplits, before.bestSplits);
+  assert.equal(result.world.car.speed, 0);
+  assert.equal(result.world.car.distance, context.startDistance);
+});
 
 function setup() {
   const controls = createControls();
