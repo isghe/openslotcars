@@ -136,6 +136,8 @@ function recordSectorCrossing(timer, time, number) {
   const sector = { number, time: time - timer.sectorStart, valid: !timer.currentSectorHadExit };
   const best = timer.bestSectors[number - 1];
   const improves = sector.valid && (best === null || sector.time < best.time);
+  // Keep the achievement even after a later attempt beats this record.
+  sector.wasBest = improves;
   const split = { number, time: time - timer.lapStart, valid: !timer.currentLapHadExit };
   const bestSplit = timer.bestSplits[number - 1];
   const improvesSplit = split.valid && (bestSplit === null || split.time < bestSplit.time);

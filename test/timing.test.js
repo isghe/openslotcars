@@ -2,14 +2,53 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { OVAL, buildCircuit } from './helpers/circuits.js';
 import { createContext, createWorld, stepWorld } from '../src/core/simulation.js';
+import { createLapTimer, recordCrossing, advanceTimer } from '../src/core/lapTimer.js';
 import {
   timingSummary,
   formatTiming,
   timingEvents,
   describeEvent,
+  bestLapSectorColors,
 } from '../src/core/timing.js';
 
 const context = createContext({ lane: buildCircuit(OVAL).lanes.inner });
+
+test('best lap marks distinguish current records, former records and other sectors', () => {
+  assert.deepEqual(bestLapSectorColors(createLapTimer()), Array(4).fill('white'));
+  let timer = recordCrossing(createLapTimer(), 0);
+  let distance = 0;
+  let time = 0;
+  const lap = (durations) => {
+    for (const dt of durations) {
+      ({ timer } = advanceTimer(timer, {
+        previousTime: time, dt, previousDistance: distance,
+        distance: distance + 1, laneLength: 4,
+      }));
+      time += dt;
+      distance += 1;
+    }
+  };
+  lap([5, 5, 5, 5]);
+  assert.deepEqual(bestLapSectorColors(timer), Array(4).fill('purple'));
+  lap([7, 4, 4, 3]);
+  const best = timer.best;
+  assert.deepEqual(bestLapSectorColors(timer), ['yellow', 'purple', 'purple', 'purple']);
+  lap([4, 4, 6, 10]);
+  assert.equal(timer.best, best);
+  assert.deepEqual(bestLapSectorColors(timer), ['yellow', 'purple', 'purple', 'purple']);
+  lap([8, 3, 3, 10]);
+  assert.equal(timer.best, best);
+  assert.deepEqual(bestLapSectorColors(timer), ['yellow', 'green', 'green', 'purple']);
+  assert.deepEqual(best.sectors.map(sector => sector.wasBest), [false, true, true, true]);
+  // A tied record is purple, but never becomes a former record if beaten.
+  lap([5, 4, 4, 3]);
+  assert.equal(timer.best.time, 16);
+  assert.deepEqual(bestLapSectorColors(timer), ['yellow', 'yellow', 'yellow', 'purple']);
+  lap([10, 10, 10, 2]);
+  assert.equal(timer.best.time, 16);
+  assert.deepEqual(bestLapSectorColors(timer), Array(4).fill('yellow'));
+  assert.deepEqual(bestLapSectorColors(recordCrossing(recordCrossing(createLapTimer(), 0), 5)), Array(4).fill('white'));
+});
 
 /** Worlds visited by a run, one per step, starting from the initial one. */
 function run(seconds, throttleFor) {

@@ -223,6 +223,31 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 
+.tile .sector-marks {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.sector-marks span {
+  flex: 1;
+  height: 6px;
+  border-radius: 2px;
+  background: #ffffff;
+}
+
+.sector-marks [data-color="green"] {
+  background: #00ff66;
+}
+
+.sector-marks [data-color="purple"] {
+  background: #c060ff;
+}
+
+.sector-marks [data-color="yellow"] {
+  background: #ffd400;
+}
+
 /*
  * The current lap can read "1:04.213 s (off track)", which wraps onto a second
  * line in a narrow tile. Two lines are always reserved, so that the tile keeps

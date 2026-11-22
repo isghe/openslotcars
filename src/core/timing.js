@@ -9,7 +9,17 @@
  * This module is pure logic: no DOM, no clock, no randomness.
  */
 
-import { formatLapTime } from './lapTimer.js';
+import { formatLapTime, SECTOR_COUNT } from './lapTimer.js';
+
+/** Purple for a current record, green for a former one, yellow for other timed sectors. */
+export function bestLapSectorColors(timer) {
+  return Array.from({ length: SECTOR_COUNT }, (_, index) => {
+    const sector = timer.best?.sectors[index];
+    if (!sector) return 'white';
+    if (sector.time === timer.bestSectors[index]?.time) return 'purple';
+    return sector.wasBest ? 'green' : 'yellow';
+  });
+}
 
 /**
  * Figures to display, taken from a world.
