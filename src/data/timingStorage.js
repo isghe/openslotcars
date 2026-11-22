@@ -11,9 +11,14 @@ function readAttempt(value, number, sector = false) {
     || (sector && typeof value.wasBest !== 'boolean')) {
     throw new TypeError('Invalid timing attempt');
   }
+  if (sector && value.lapNumber !== undefined
+    && (!Number.isSafeInteger(value.lapNumber) || value.lapNumber < 1)) {
+    throw new TypeError('Invalid sector lap number');
+  }
   return {
     number, time: value.time, valid: value.valid,
     ...(sector ? { wasBest: value.wasBest } : {}),
+    ...(sector && value.lapNumber !== undefined ? { lapNumber: value.lapNumber } : {}),
   };
 }
 

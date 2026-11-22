@@ -23,9 +23,10 @@ function setText(element, text) {
 /**
  * @param {{currentLap: HTMLElement, lastLap: HTMLElement, bestLap: HTMLElement,
  *   bestLapNumber: HTMLElement, bestLapSectors: HTMLElement, bestSectorsSum: HTMLElement,
+ *   bestSectorLaps: HTMLElement,
  *   laps: HTMLElement, announcer: HTMLElement}} elements
  */
-export function createHud({ currentLap, lastLap, bestLap, bestLapNumber, bestLapSectors, bestSectorsSum, laps, announcer }) {
+export function createHud({ currentLap, lastLap, bestLap, bestLapNumber, bestLapSectors, bestSectorsSum, bestSectorLaps, laps, announcer }) {
   let shown = null;
 
   return {
@@ -49,6 +50,9 @@ export function createHud({ currentLap, lastLap, bestLap, bestLapNumber, bestLap
         bestLapSectors.title = label;
       }
       setText(bestSectorsSum, texts.bestSectorsSum);
+      setText(bestSectorLaps, world.timer.bestSectors.map((sector) => (
+        sector?.lapNumber ? `#${sector.lapNumber}` : '—'
+      )).join(' · '));
       setText(laps, texts.laps);
 
       if (shown !== null) {

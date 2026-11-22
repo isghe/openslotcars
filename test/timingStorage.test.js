@@ -50,6 +50,7 @@ test('archives survive a new store and retain laps, records and mark history', (
   assert.deepEqual(restored.laps[2].exits, [{ time: 0.25, distance: 0.25, sector: 1 }]);
   assert.equal(restored.best, restored.laps[1]);
   assert.deepEqual(restored.bestSectors, timer.bestSectors);
+  assert.deepEqual(restored.bestSectors.map(sector => sector.lapNumber), [4, 3, 3, 2]);
   assert.deepEqual(restored.bestSplits, timer.bestSplits);
   assert.deepEqual(bestLapSectorColors(restored), ['yellow', 'green', 'green', 'purple']);
   assert.equal(restored.lapStart, null);
@@ -59,6 +60,20 @@ test('archives survive a new store and retain laps, records and mark history', (
   const next = recordCrossing(recordCrossing(restored, 0), 30);
   assert.equal(next.laps[3].number, 4);
   assert.equal(next.laps[3].time, 30);
+});
+
+test('older sector records remain available without a known lap number', () => {
+  const storage = memory();
+  archive(storage).save(history());
+  const [key, raw] = [...storage.data][0];
+  const data = JSON.parse(raw);
+  for (const lap of data.laps) for (const sector of lap.sectors) delete sector.lapNumber;
+  for (const sector of data.bestSectors) delete sector.lapNumber;
+  storage.data.set(key, JSON.stringify(data));
+  const restored = archive(storage).load();
+  assert.equal(restored.laps.length, 3);
+  assert.deepEqual(restored.bestSectors.map(sector => sector.time), [1, 3, 3, 3]);
+  assert.ok(restored.bestSectors.every(sector => sector.lapNumber === undefined));
 });
 
 test('older archives keep their laps without inventing exit details', () => {

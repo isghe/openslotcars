@@ -16,6 +16,7 @@ function setup() {
       setAttribute(name, value) { this[name] = value; },
     },
     bestSectorsSum: { textContent: '' },
+    bestSectorLaps: { textContent: '' },
     laps: { textContent: '' },
     announcer: { textContent: '' },
   };
@@ -30,6 +31,7 @@ test('a restart announces the race restarted and shows the new world', () => {
   assert.equal(elements.laps.textContent, '0');
   assert.equal(elements.bestLap.textContent, 'none yet');
   assert.equal(elements.bestSectorsSum.textContent, 'none yet');
+  assert.equal(elements.bestSectorLaps.textContent, '— · — · — · —');
 });
 
 test('the best sectors sum updates and clears on restart', () => {
@@ -45,6 +47,16 @@ test('the best sectors sum updates and clears on restart', () => {
   assert.equal(elements.bestSectorsSum.textContent, '5.000 s');
   hud.restart(world);
   assert.equal(elements.bestSectorsSum.textContent, 'none yet');
+});
+
+test('best sector lap numbers update independently and clear with the circuit', () => {
+  const { elements, hud, world } = setup();
+  hud.update({ ...world, timer: { ...world.timer,
+    bestSectors: [{ time: 1, lapNumber: 2 }, { time: 2, lapNumber: 5 }, { time: 3 }, null],
+  } });
+  assert.equal(elements.bestSectorLaps.textContent, '#2 · #5 · — · —');
+  hud.restart(world);
+  assert.equal(elements.bestSectorLaps.textContent, '— · — · — · —');
 });
 
 test('a restart can announce another message, for example a new circuit', () => {
