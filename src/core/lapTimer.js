@@ -49,6 +49,17 @@ export function createLapTimer() {
   };
 }
 
+/** Starts a fresh attempt while retaining completed laps and sector records. */
+export function restartLapTimer(timer) {
+  return {
+    ...createLapTimer(),
+    laps: timer.laps,
+    best: timer.best,
+    bestSectors: timer.bestSectors,
+    bestSplits: timer.bestSplits,
+  };
+}
+
 /**
  * Finish line crossings made while the total distance goes from
  * `previousDistance` to `distance`. The line is at every multiple of the lane
