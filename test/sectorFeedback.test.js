@@ -43,28 +43,28 @@ for (const definition of CIRCUITS) {
       }));
       previousTime += 1;
       previousDistance = distance;
-      assert.deepEqual(draw(), { green: boundary, purple: boundary });
+      assert.deepEqual(draw(), { green: 2 * boundary, purple: 2 * boundary });
     }
     assert.equal(timer.laps[0].sectors.length, 4);
     assert.ok(Math.abs(timer.laps[0].time - 4) < 1e-9);
     for (const sector of timer.laps[0].sectors) assert.ok(Math.abs(sector.time - 1) < 1e-9);
     renderer.resize();
     renderer.setDisplayOptions({ curbs: true, curveMarkers: true });
-    assert.deepEqual(draw(), { green: 4, purple: 4 });
+    assert.deepEqual(draw(), { green: 8, purple: 8 });
     const rectanglesWithFeedback = drawing.rectangles.length;
     renderer.setDisplayOptions({ curbs: true, curveMarkers: true, sectorFeedback: false });
     assert.deepEqual(draw(), { green: 0, purple: 0 });
-    assert.equal(drawing.rectangles.length, rectanglesWithFeedback - 8);
+    assert.equal(drawing.rectangles.length, rectanglesWithFeedback - 16);
     assert.deepEqual(draw({ paused: true }), { green: 0, purple: 0 });
     renderer.setDisplayOptions({ curbs: true, curveMarkers: true, sectorFeedback: true });
-    assert.deepEqual(draw(), { green: 4, purple: 4 });
-    // A renderer opened with the option off omits all bands from its first draw.
+    assert.deepEqual(draw(), { green: 8, purple: 8 });
+    // A renderer opened with the option off omits all squares from its first draw.
     const hiddenRenderer = createRenderer(canvas, circuit, context, { sectorFeedback: false });
     drawing.rectangles.length = 0;
     hiddenRenderer.draw({ ...createWorld(context), timer }, { steps: [] });
-    assert.equal(drawing.rectangles.length, rectanglesWithFeedback - 8);
+    assert.equal(drawing.rectangles.length, rectanglesWithFeedback - 16);
     assert.ok(drawing.rectangles.every(rectangle => !['#00ff66', '#c060ff'].includes(rectangle.color)));
-    // Slower attempts clear both bands as each boundary is crossed again.
+    // Slower attempts clear both pairs of squares as each boundary is crossed again.
     for (let boundary = 1; boundary <= 4; boundary += 1) {
       const distance = context.laneLength * (1 + boundary / 4);
       ({ timer } = advanceTimer(timer, {
@@ -72,7 +72,7 @@ for (const definition of CIRCUITS) {
       }));
       previousTime += 2;
       previousDistance = distance;
-      assert.deepEqual(draw(), { green: 4 - boundary, purple: 4 - boundary });
+      assert.deepEqual(draw(), { green: 2 * (4 - boundary), purple: 2 * (4 - boundary) });
     }
     timer = createLapTimer();
     assert.deepEqual(draw(), { green: 0, purple: 0 });
