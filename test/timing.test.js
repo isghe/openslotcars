@@ -2,14 +2,53 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { OVAL, buildCircuit } from './helpers/circuits.js';
 import { createContext, createWorld, stepWorld } from '../src/core/simulation.js';
+import { createLapTimer, recordCrossing, advanceTimer } from '../src/core/lapTimer.js';
 import {
   timingSummary,
   formatTiming,
   timingEvents,
   describeEvent,
+  bestLapSectorColors,
 } from '../src/core/timing.js';
 
 const context = createContext({ lane: buildCircuit(OVAL).lanes.inner });
+
+test('best lap marks distinguish current records, former records and other sectors', () => {
+  assert.deepEqual(bestLapSectorColors(createLapTimer()), Array(4).fill('white'));
+  let timer = recordCrossing(createLapTimer(), 0);
+  let distance = 0;
+  let time = 0;
+  const lap = (durations) => {
+    for (const dt of durations) {
+      ({ timer } = advanceTimer(timer, {
+        previousTime: time, dt, previousDistance: distance,
+        distance: distance + 1, laneLength: 4,
+      }));
+      time += dt;
+      distance += 1;
+    }
+  };
+  lap([5, 5, 5, 5]);
+  assert.deepEqual(bestLapSectorColors(timer), Array(4).fill('purple'));
+  lap([7, 4, 4, 3]);
+  const best = timer.best;
+  assert.deepEqual(bestLapSectorColors(timer), ['yellow', 'purple', 'purple', 'purple']);
+  lap([4, 4, 6, 10]);
+  assert.equal(timer.best, best);
+  assert.deepEqual(bestLapSectorColors(timer), ['yellow', 'purple', 'purple', 'purple']);
+  lap([8, 3, 3, 10]);
+  assert.equal(timer.best, best);
+  assert.deepEqual(bestLapSectorColors(timer), ['yellow', 'green', 'green', 'purple']);
+  assert.deepEqual(best.sectors.map(sector => sector.wasBest), [false, true, true, true]);
+  // A tied record is purple, but never becomes a former record if beaten.
+  lap([5, 4, 4, 3]);
+  assert.equal(timer.best.time, 16);
+  assert.deepEqual(bestLapSectorColors(timer), ['yellow', 'yellow', 'yellow', 'purple']);
+  lap([10, 10, 10, 2]);
+  assert.equal(timer.best.time, 16);
+  assert.deepEqual(bestLapSectorColors(timer), Array(4).fill('yellow'));
+  assert.deepEqual(bestLapSectorColors(recordCrossing(recordCrossing(createLapTimer(), 0), 5)), Array(4).fill('white'));
+});
 
 /** Worlds visited by a run, one per step, starting from the initial one. */
 function run(seconds, throttleFor) {
@@ -53,6 +92,7 @@ test('before the first crossing the clock has not started', () => {
     currentLap: 'not started',
     lastLap: 'none yet',
     bestLap: 'none yet',
+    bestSectorsSum: 'none yet',
     laps: '0',
   });
 });
@@ -64,6 +104,26 @@ test('the running lap time is measured from the last crossing', () => {
   assert.ok(summary.currentLap > 0);
   assert.ok(Math.abs(summary.currentLap - (world.time - world.timer.lapStart)) < 1e-12);
   assert.match(formatTiming(summary).currentLap, /^\d\.\d s$/);
+});
+
+test('the sum needs every sector record and uses individual bests across laps', () => {
+  let world = createWorld(context);
+  assert.equal(timingSummary(world).bestSectorsSum, null);
+  world = {
+    ...world,
+    timer: {
+      ...world.timer,
+      bestSectors: [1.1114, 2.2224, 3.3334, null].map((time) => (
+        time === null ? null : { time, valid: true }
+      )),
+    },
+  };
+  assert.equal(timingSummary(world).bestSectorsSum, null);
+  world.timer.bestSectors[3] = { time: 4.4444, valid: true };
+  assert.equal(formatTiming(timingSummary(world)).bestSectorsSum, '11.112 s');
+  world.timer.bestSectors[0] = { time: 1, valid: true };
+  assert.equal(formatTiming(timingSummary(world)).bestSectorsSum, '11.000 s');
+  assert.equal(timingSummary(world).bestLap, null);
 });
 
 test('closed laps are summarized with the best valid one', () => {
@@ -96,6 +156,7 @@ test('minutes appear in a long running lap', () => {
     currentLapHadExit: false,
     lastLap: null,
     bestLap: null,
+    bestSectorsSum: null,
     lapsCompleted: 0,
   };
   assert.equal(formatTiming(summary).currentLap, '1:15.3');

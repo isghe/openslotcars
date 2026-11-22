@@ -25,7 +25,13 @@
         <dl class="tiles">
           <div class="tile"><dt>Current lap</dt><dd id="current-lap">not started</dd></div>
           <div class="tile"><dt>Last lap</dt><dd id="last-lap">none yet</dd></div>
-          <div class="tile"><dt>Best lap</dt><dd id="best-lap">none yet</dd></div>
+          <div class="tile">
+            <dt>Best lap</dt><dd id="best-lap">none yet</dd>
+            <dd id="best-lap-sectors" class="sector-marks" aria-label="Best lap sectors: no lap yet">
+              <span data-color="white"></span><span data-color="white"></span><span data-color="white"></span><span data-color="white"></span>
+            </dd>
+          </div>
+          <div class="tile"><dt>Best sectors sum</dt><dd id="best-sectors-sum">none yet</dd></div>
           <div class="tile"><dt>Laps</dt><dd id="laps">0</dd></div>
         </dl>
         <p id="announcer" class="announcer" role="status" aria-live="polite"></p>

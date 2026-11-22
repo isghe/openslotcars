@@ -98,7 +98,7 @@ test('four equal-distance sectors retain individual durations and sum to the lap
     assert.equal(timer.currentSectors.length, sector % 4);
   }
   assert.deepEqual(timer.laps[0].sectors, [1, 2, 3, 4].map(number => ({
-    number, time: number, valid: true,
+    number, time: number, valid: true, wasBest: true,
   })));
   near(timer.laps[0].sectors.reduce((sum, sector) => sum + sector.time, 0), timer.laps[0].time);
 });

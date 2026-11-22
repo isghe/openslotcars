@@ -12,6 +12,7 @@ import {
   formatTiming,
   timingEvents,
   describeEvent,
+  bestLapSectorColors,
 } from '../core/timing.js';
 
 function setText(element, text) {
@@ -21,9 +22,10 @@ function setText(element, text) {
 
 /**
  * @param {{currentLap: HTMLElement, lastLap: HTMLElement, bestLap: HTMLElement,
+ *   bestLapSectors: HTMLElement, bestSectorsSum: HTMLElement,
  *   laps: HTMLElement, announcer: HTMLElement}} elements
  */
-export function createHud({ currentLap, lastLap, bestLap, laps, announcer }) {
+export function createHud({ currentLap, lastLap, bestLap, bestLapSectors, bestSectorsSum, laps, announcer }) {
   let shown = null;
 
   return {
@@ -33,6 +35,19 @@ export function createHud({ currentLap, lastLap, bestLap, laps, announcer }) {
       setText(currentLap, texts.currentLap);
       setText(lastLap, texts.lastLap);
       setText(bestLap, texts.bestLap);
+      const colors = bestLapSectorColors(world.timer);
+      colors.forEach((color, index) => {
+        const mark = bestLapSectors.children[index];
+        if (mark.dataset.color !== color) mark.dataset.color = color;
+      });
+      const label = world.timer.best === null
+        ? 'Best lap sectors: no lap yet'
+        : colors.map((color, index) => `Sector ${index + 1}: ${color}`).join('; ');
+      if (bestLapSectors.getAttribute('aria-label') !== label) {
+        bestLapSectors.setAttribute('aria-label', label);
+        bestLapSectors.title = label;
+      }
+      setText(bestSectorsSum, texts.bestSectorsSum);
       setText(laps, texts.laps);
 
       if (shown !== null) {

@@ -9,12 +9,23 @@
  * This module is pure logic: no DOM, no clock, no randomness.
  */
 
-import { formatLapTime } from './lapTimer.js';
+import { formatLapTime, SECTOR_COUNT } from './lapTimer.js';
+
+/** Purple for a current record, green for a former one, yellow for other timed sectors. */
+export function bestLapSectorColors(timer) {
+  return Array.from({ length: SECTOR_COUNT }, (_, index) => {
+    const sector = timer.best?.sectors[index];
+    if (!sector) return 'white';
+    if (sector.time === timer.bestSectors[index]?.time) return 'purple';
+    return sector.wasBest ? 'green' : 'yellow';
+  });
+}
 
 /**
  * Figures to display, taken from a world.
  * @returns {{currentLap: number|null, currentLapHadExit: boolean,
- *   lastLap: object|null, bestLap: object|null, lapsCompleted: number}}
+ *   lastLap: object|null, bestLap: object|null, bestSectorsSum: number|null,
+ *   lapsCompleted: number}}
  *   `currentLap` is the time of the running lap in seconds, or `null` until
  *   the car has crossed the finish line for the first time.
  */
@@ -26,6 +37,9 @@ export function timingSummary(world) {
     currentLapHadExit: timer.currentLapHadExit,
     lastLap: laps.length > 0 ? laps[laps.length - 1] : null,
     bestLap: timer.best,
+    bestSectorsSum: timer.bestSectors.every((sector) => sector !== null)
+      ? timer.bestSectors.reduce((sum, sector) => sum + sector.time, 0)
+      : null,
     lapsCompleted: laps.length,
   };
 }
@@ -34,7 +48,8 @@ export function timingSummary(world) {
  * Texts of the panel for a summary. The running lap is shown with a tenth of
  * a second, so it changes about ten times per second; closed laps are shown
  * with milliseconds. A lap with an exit is labeled, because it does not count.
- * @returns {{currentLap: string, lastLap: string, bestLap: string, laps: string}}
+ * @returns {{currentLap: string, lastLap: string, bestLap: string,
+ *   bestSectorsSum: string, laps: string}}
  */
 export function formatTiming(summary) {
   const offTrack = ' (off track)';
@@ -46,6 +61,8 @@ export function formatTiming(summary) {
       ? 'none yet'
       : formatLapTime(summary.lastLap.time) + (summary.lastLap.valid ? '' : offTrack),
     bestLap: summary.bestLap === null ? 'none yet' : formatLapTime(summary.bestLap.time),
+    bestSectorsSum: summary.bestSectorsSum === null
+      ? 'none yet' : formatLapTime(summary.bestSectorsSum),
     laps: String(summary.lapsCompleted),
   };
 }
