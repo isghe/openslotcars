@@ -34,15 +34,17 @@ function assertPositiveFinite(value, name) {
  * Creates a timer that has not started yet.
  * @returns {{lapStart: number|null, currentLapHadExit: boolean,
  *   sectorStart: number|null, currentSectorHadExit: boolean, currentSectors: object[],
+ *   currentExits: Array<{time: number, distance: number, sector: number}>,
  *   lastSectors: Array<object|null>, bestSectors: Array<object|null>,
  *   lastSplits: Array<object|null>, bestSplits: Array<object|null>,
- *   laps: Array<{number: number, time: number, valid: boolean, sectors: object[]}>,
+ *   laps: Array<{number: number, time: number, valid: boolean, sectors: object[], exits: object[]|null}>,
  *   best: {number: number, time: number, valid: boolean}|null}}
  */
 export function createLapTimer() {
   return {
     lapStart: null, currentLapHadExit: false,
     sectorStart: null, currentSectorHadExit: false, currentSectors: [],
+    currentExits: [],
     lastSectors: Array(SECTOR_COUNT).fill(null), bestSectors: Array(SECTOR_COUNT).fill(null),
     lastSplits: Array(SECTOR_COUNT).fill(null), bestSplits: Array(SECTOR_COUNT).fill(null),
     laps: [], best: null,
@@ -104,6 +106,7 @@ export function recordCrossing(timer, time) {
     return {
       ...timer, lapStart: time, currentLapHadExit: false,
       sectorStart: time, currentSectorHadExit: false, currentSectors: [],
+      currentExits: [],
     };
   }
   if (time < timer.lapStart) {
@@ -115,6 +118,7 @@ export function recordCrossing(timer, time) {
     number: timer.laps.length + 1,
     time: lapTime,
     valid: !timer.currentLapHadExit,
+    exits: timer.currentExits,
     // Direct finish-only callers cannot supply sector times. Never invent
     // splits for a lap whose intermediate crossings were not recorded.
     sectors: timed.currentSectors.length === SECTOR_COUNT ? timed.currentSectors : [],
@@ -127,6 +131,7 @@ export function recordCrossing(timer, time) {
     sectorStart: time,
     currentSectorHadExit: false,
     currentSectors: [],
+    currentExits: [],
     laps: [...timer.laps, lap],
     best: improves ? lap : timer.best,
   };
@@ -135,10 +140,26 @@ export function recordCrossing(timer, time) {
 /**
  * Marks the running lap as not valid because the car left the track. An exit
  * before the clock starts does not affect any timed lap and is ignored.
+ * Optional details use simulation time and total lane distance. Recorded times
+ * are seconds since lap start, and distances are meters from the finish line
+ * along the driven lane. Detection occurs at the end of the simulation step.
  */
-export function markExit(timer) {
+export function markExit(timer, details = null) {
   if (timer.lapStart === null) return timer;
-  return { ...timer, currentLapHadExit: true, currentSectorHadExit: true };
+  let currentExits = timer.currentExits;
+  if (details !== null) {
+    const { time, distance, laneLength } = details;
+    assertFinite(time, 'time');
+    assertFinite(distance, 'distance');
+    assertPositiveFinite(laneLength, 'laneLength');
+    if (time < timer.lapStart) throw new RangeError('exit precedes lap start');
+    const lapDistance = ((distance % laneLength) + laneLength) % laneLength;
+    currentExits = [...currentExits, {
+      time: time - timer.lapStart, distance: lapDistance,
+      sector: timer.currentSectors.length + 1,
+    }];
+  }
+  return { ...timer, currentLapHadExit: true, currentSectorHadExit: true, currentExits };
 }
 
 /** Records a split only after the start and all preceding sector boundaries. */

@@ -23,7 +23,7 @@ function history() {
   let time = 0;
   let distance = 0;
   for (const durations of [[5, 5, 5, 5], [7, 4, 4, 3], [3, 3, 3, 10]]) {
-    if (distance === 8) timer = markExit(timer);
+    if (distance === 8) timer = markExit(timer, { time: time + 0.25, distance: 8.25, laneLength: 4 });
     for (const dt of durations) {
       ({ timer } = advanceTimer(timer, {
         previousTime: time, dt, previousDistance: distance,
@@ -47,6 +47,7 @@ test('archives survive a new store and retain laps, records and mark history', (
   const restored = archive(storage).load();
   assert.deepEqual(restored.laps, timer.laps);
   assert.equal(restored.laps[2].valid, false);
+  assert.deepEqual(restored.laps[2].exits, [{ time: 0.25, distance: 0.25, sector: 1 }]);
   assert.equal(restored.best, restored.laps[1]);
   assert.deepEqual(restored.bestSectors, timer.bestSectors);
   assert.deepEqual(restored.bestSplits, timer.bestSplits);
@@ -58,6 +59,39 @@ test('archives survive a new store and retain laps, records and mark history', (
   const next = recordCrossing(recordCrossing(restored, 0), 30);
   assert.equal(next.laps[3].number, 4);
   assert.equal(next.laps[3].time, 30);
+});
+
+test('older archives keep their laps without inventing exit details', () => {
+  const storage = memory();
+  archive(storage).save(history());
+  const [key, raw] = [...storage.data][0];
+  const data = JSON.parse(raw);
+  for (const lap of data.laps) delete lap.exits;
+  storage.data.set(key, JSON.stringify(data));
+  const restored = archive(storage).load();
+  assert.equal(restored.laps.length, 3);
+  assert.deepEqual(restored.laps[0].exits, []);
+  assert.equal(restored.laps[2].exits, null);
+  archive(storage).save(restored);
+  assert.equal(archive(storage).load().laps[2].exits, null);
+});
+
+test('malformed exit details are rejected', () => {
+  const storage = memory();
+  archive(storage).save(history());
+  const [key, raw] = [...storage.data][0];
+  for (const exits of [
+    [{ time: -1, distance: 1, sector: 1 }],
+    [{ time: 100, distance: 1, sector: 1 }],
+    [{ time: 1, distance: -1, sector: 1 }],
+    [{ time: 1, distance: 1, sector: 5 }],
+    [{ time: 2, distance: 1, sector: 1 }, { time: 1, distance: 1, sector: 1 }],
+  ]) {
+    const data = JSON.parse(raw);
+    data.laps[2].exits = exits;
+    storage.data.set(key, JSON.stringify(data));
+    assert.deepEqual(archive(storage).load(), createLapTimer());
+  }
 });
 
 test('circuits are independent and clear removes only the current circuit', () => {

@@ -178,7 +178,7 @@ export function stepWorld(world, input, context) {
         time,
         // The exit belongs to the lap running at the exit point, which is the
         // new lap if the line was crossed in this very step.
-        timer: markExit(timer),
+        timer: markExit(timer, { time, distance: next.distance, laneLength: context.laneLength }),
         car: {
           status: 'offTrack',
           distance: next.distance,

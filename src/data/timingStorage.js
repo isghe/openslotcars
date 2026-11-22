@@ -29,6 +29,24 @@ function readRecords(values, sector) {
   });
 }
 
+function readExits(values, lap) {
+  // Old invalid laps lack locations; keep that distinction from a clean lap.
+  if (values === undefined || (values === null && !lap.valid)) return lap.valid ? [] : null;
+  if (!Array.isArray(values) || (lap.valid && values.length > 0)) {
+    throw new TypeError('Invalid lap exits');
+  }
+  let previousTime = 0;
+  return values.map(value => {
+    if (!value || !duration(value.time) || value.time > lap.time
+      || value.time < previousTime || !duration(value.distance)
+      || !Number.isInteger(value.sector) || value.sector < 1 || value.sector > SECTOR_COUNT) {
+      throw new TypeError('Invalid exit details');
+    }
+    previousTime = value.time;
+    return { time: value.time, distance: value.distance, sector: value.sector };
+  });
+}
+
 function readArchive(raw, signature) {
   const data = JSON.parse(raw);
   if (data?.version !== 1 || data.signature !== signature || !Array.isArray(data.laps)) {
@@ -44,7 +62,7 @@ function readArchive(raw, signature) {
       || (lap.valid && sectors.some(sector => !sector.valid))) {
       throw new TypeError('Inconsistent lap');
     }
-    return { ...lap, sectors };
+    return { ...lap, sectors, exits: readExits(value.exits, lap) };
   });
   const best = laps.reduce((best, lap) => (
     lap.valid && (best === null || lap.time < best.time) ? lap : best

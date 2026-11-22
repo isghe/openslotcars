@@ -102,6 +102,28 @@ test('full throttle makes the car leave the track at the entrance of the first c
   assert.equal(exit.timer.currentLapHadExit, true);
 });
 
+for (const tailSlide of [false, true]) {
+  test(`exit locations and lap-relative times are recorded once (tailSlide=${tailSlide})`, () => {
+    const context = contextFor('inner', { tailSlide });
+    let left = false;
+    const history = run(context, 40, world => {
+      if (world.car.status === 'offTrack') left = true;
+      return left ? 0.3 : 1;
+    });
+    const exit = history.find(world => world.car.status === 'offTrack');
+    const lap = history.at(-1).timer.laps[0];
+    assert.equal(lap.valid, false);
+    assert.equal(lap.exits.length, 1);
+    assert.equal(lap.exits[0].time, exit.time - exit.timer.lapStart);
+    assert.ok(Math.abs(lap.exits[0].distance - exit.car.distance % context.laneLength) < 1e-12);
+    assert.equal(lap.exits[0].sector, exit.timer.currentSectors.length + 1);
+    assert.deepEqual(history.at(-1).timer.laps[1].exits, []);
+    for (const world of history.filter(world => world.car.status === 'offTrack')) {
+      assert.equal(world.timer.currentExits.length, 1);
+    }
+  });
+}
+
 test('the throttle is ignored while the car is off the track', () => {
   const context = contextFor('inner');
   const history = run(context, 3, () => 1);

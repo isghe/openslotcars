@@ -73,7 +73,16 @@ The game pauses by itself when the window loses the focus or the page is hidden.
 Timing archives use `openslotcars:timing:v1:<circuit-id>` in localStorage. They
 contain completed laps (including invalid ones and their sectors), individual
 sector records, cumulative records and the sector record history used by the
-colored marks. New timing results are saved at sector boundaries, rather than
+colored marks. Each newly completed lap also stores an `exits` array: each
+entry contains `time` in seconds since that lap started, `distance` in meters
+from the finish line along the driven lane, and `sector` numbered 1 through 4.
+Exits are detected at the end of a simulation step, without interpolating the
+instant when grip was lost. Several exits in one lap are kept in order; the
+off-track recovery steps do not add duplicate events. Old invalid laps without
+exit details keep `exits: null`; their locations and times cannot be recovered.
+Clean laps have an empty array. Exit details are saved with the completed lap,
+so an unfinished lap's events are discarded on restart or page reload.
+New timing results are saved at sector boundaries, rather than
 on every animation frame. The car position and unfinished lap are not restored.
 Restart keeps these archives; Reset asks for confirmation before deleting the
 current circuit's archive and resetting its car and timing panel. Other circuits
