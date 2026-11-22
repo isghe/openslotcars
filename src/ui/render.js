@@ -79,8 +79,8 @@ const TIRE_MARK_COOL = Object.freeze([0xd7, 0xdb, 0xe2]);
 const TIRE_MARK_HOT = Object.freeze([0xff, 0x70, 0x70]);
 const CHECKER_DEPTH = 0.016;
 const CHECKER_CELLS = 8;
-const SECTOR_LINE_WIDTH = 0.024;
-const SECTOR_LINE_GAP = 0.012;
+const SECTOR_MARK_SIZE = 0.024;
+const SECTOR_MARK_GAP = 0.012;
 // The chevron after the finish line that shows the direction of travel. It is
 // narrower than the distance between the slots (0.10 m), so it does not cover
 // them, and it starts beyond the checkered line (which ends at 0.016 m).
@@ -248,19 +248,22 @@ export function createRenderer(canvas, circuit, context, {
     }
   }
 
-  /** Fixed, solid sector lines: no flashes, animation or numeric display. */
-  function drawSectorLines(sectors, cumulative) {
+  /** Fixed squares beside each sector end, clear of the track and curbs. */
+  function drawSectorMarks(sectors, cumulative) {
     sectorEnds.forEach((pose, index) => {
       withPose(surface, pose, () => {
-        // Two separate bands just before the boundary, clear of the checker:
+        // A pair of squares on each side, just before the boundary:
         // green for the sector, then purple for elapsed time from the start.
         [sectors[index] ? PALETTE.finishBest : PALETTE.checkerLight,
           cumulative[index] ? PALETTE.cumulativeBest : PALETTE.checkerLight].forEach((color, row) => {
           surface.fillStyle = color;
-          surface.fillRect(
-            (-CHECKER_DEPTH - (2 - row) * (SECTOR_LINE_WIDTH + SECTOR_LINE_GAP)) * scale,
-            -circuit.trackWidth * scale / 2, SECTOR_LINE_WIDTH * scale, circuit.trackWidth * scale,
-          );
+          const offset = circuit.trackWidth / 2 + EDGE_WIDTH + CURB_WIDTH + SECTOR_MARK_GAP;
+          for (const y of [-offset - SECTOR_MARK_SIZE, offset]) {
+            surface.fillRect(
+              (-CHECKER_DEPTH - (2 - row) * (SECTOR_MARK_SIZE + SECTOR_MARK_GAP)) * scale,
+              y * scale, SECTOR_MARK_SIZE * scale, SECTOR_MARK_SIZE * scale,
+            );
+          }
         });
       });
     });
@@ -450,7 +453,7 @@ export function createRenderer(canvas, circuit, context, {
     if (restarted) tireMarks.reset();
     for (const step of steps) tireMarks.record(step, context);
     drawTireMarks(world.time);
-    if (showSectorFeedback) drawSectorLines(sectorFeedback(world.timer), cumulativeFeedback(world.timer));
+    if (showSectorFeedback) drawSectorMarks(sectorFeedback(world.timer), cumulativeFeedback(world.timer));
     drawFinishLine(surface);
     drawCar(world);
     if (paused) drawPauseOverlay();
