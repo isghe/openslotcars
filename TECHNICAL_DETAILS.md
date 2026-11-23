@@ -76,6 +76,9 @@ The throttle rises gradually while the key is held, in 0.4 seconds from nothing 
 
 The game pauses by itself when the window loses the focus or the page is hidden.
 
+The page uses a lateral grip limit of 6 m/s² on every circuit, half the physics
+module's default, while keeping the motor free speed at 5 m/s.
+
 Timing archives use `openslotcars:timing:v2:<circuit-id>:<encoded-signature>` in
 localStorage, with the full signature encoded using `encodeURIComponent`. They
 contain completed laps (including invalid ones and their sectors), individual
