@@ -76,7 +76,8 @@ The throttle rises gradually while the key is held, in 0.4 seconds from nothing 
 
 The game pauses by itself when the window loses the focus or the page is hidden.
 
-Timing archives use `openslotcars:timing:v1:<circuit-id>` in localStorage. They
+Timing archives use `openslotcars:timing:v2:<circuit-id>:<encoded-signature>` in
+localStorage, with the full signature encoded using `encodeURIComponent`. They
 contain completed laps (including invalid ones and their sectors), individual
 sector records, cumulative records and the sector record history used by the
 colored marks. Each newly completed lap also stores an `exits` array: each
@@ -91,10 +92,16 @@ so an unfinished lap's events are discarded on restart or page reload.
 New timing results are saved at sector boundaries, rather than
 on every animation frame. The car position and unfinished lap are not restored.
 Restart keeps these archives; Reset asks for confirmation before deleting the
-current circuit's archive and resetting its car and timing panel. Other circuits
-are unaffected. Reloading, revisiting a circuit or reopening the site restores
-its compatible archive. Circuit geometry and physics settings are part of the
-archive signature; incompatible or malformed archives are ignored.
+current circuit and configuration's archive and resetting its car and timing
+panel. Other circuits and configurations are unaffected. Circuit geometry,
+physics settings and simulation rules are part of the archive signature, so
+changing them selects a separate archive. Returning to an earlier configuration
+restores its records. Malformed or incompatible archive contents are ignored.
+Legacy archives at `openslotcars:timing:v1:<circuit-id>` are read when their
+signature matches and no configuration archive exists. The next timing result
+is saved under the new key; the legacy entry is retained until Reset is used
+with its matching configuration. Results already overwritten by older versions
+cannot be recovered.
 
 The data stays in that browser profile and site origin, so another browser,
 device, hostname or port has a separate history. Clearing browser site data

@@ -40,6 +40,12 @@ function history() {
   }).timer;
 }
 
+function finishLap(timer, time) {
+  return advanceTimer(recordCrossing(timer, 0), {
+    previousTime: 0, dt: time, previousDistance: 0, distance: 4, laneLength: 4,
+  }).timer;
+}
+
 test('archives survive a new store and retain laps, records and mark history', () => {
   const storage = memory();
   const timer = history();
@@ -124,6 +130,50 @@ test('changed circuit geometry or physics ignores incompatible records', () => {
   const storage = memory();
   archive(storage).save(history());
   assert.deepEqual(archive(storage, 'oval', 'changed-rules').load(), createLapTimer());
+});
+
+test('configuration changes preserve independent records when switching back', () => {
+  const storage = memory();
+  archive(storage).save(history());
+  const changed = archive(storage, 'oval', 'changed-rules');
+  changed.save(finishLap(createLapTimer(), 30));
+  assert.equal(archive(storage).load().laps.length, 3);
+  assert.equal(archive(storage, 'oval', 'changed-rules').load().best.time, 30);
+  assert.equal(changed.clear(), true);
+  assert.equal(archive(storage, 'oval', 'changed-rules').load().laps.length, 0);
+  assert.equal(archive(storage).load().laps.length, 3);
+});
+
+function legacy(storage) {
+  archive(storage).save(history());
+  const [[key, raw]] = storage.data;
+  storage.data.delete(key);
+  storage.data.set('openslotcars:timing:v1:oval', raw);
+  return raw;
+}
+
+test('legacy records survive saving and clearing a different configuration', () => {
+  const storage = memory();
+  const raw = legacy(storage);
+  const changed = archive(storage, 'oval', 'changed-rules');
+  assert.equal(changed.load().laps.length, 0);
+  changed.save(createLapTimer());
+  assert.equal(changed.clear(), true);
+  assert.equal(storage.data.get('openslotcars:timing:v1:oval'), raw);
+  assert.equal(archive(storage).load().laps.length, 3);
+});
+
+test('matching legacy records are loaded and saved under the configuration key', () => {
+  const storage = memory();
+  legacy(storage);
+  const store = archive(storage);
+  const restored = store.load();
+  assert.equal(restored.laps.length, 3);
+  store.save(finishLap(restored, 30));
+  assert.equal(archive(storage).load().laps.length, 4);
+  assert.equal(store.clear(), true);
+  assert.equal(archive(storage).load().laps.length, 0);
+  assert.equal(storage.data.has('openslotcars:timing:v1:oval'), false);
 });
 
 test('missing, malformed and invalid archives start with a fresh timer', () => {
