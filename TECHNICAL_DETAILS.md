@@ -152,6 +152,10 @@ when its parameter is exactly `1`. Any other value turns it off. When a
 parameter is repeated, its first value counts. The menu updates the current
 address so the options can be reopened or shared.
 
+The menu also shows **Lateral grip**, the active circuit's lateral acceleration
+limit in m/s² (currently 6 m/s²). This read-only value comes from the simulation
+parameters and updates when a circuit starts; it cannot be changed from the menu.
+
 Each join between arcs has one shared exit/entry line, even when both arcs
 turn the same way. This also shows changes of radius in compound corners.
 Violet lines mark the midpoint of each individual arc and each continuous
