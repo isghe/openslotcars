@@ -77,6 +77,7 @@ async function start() {
   function startCircuit(definition) {
     const circuit = buildCircuit(definition);
     const context = createContext({ lane: circuit.lanes.inner, params: drivingParams });
+    document.getElementById('lateral-grip').textContent = String(context.params.maxLateralAcceleration);
     activeCircuit = definition;
     if (!timingArchives.has(definition.id)) {
       timingArchives.set(definition.id, createTimingStorage({
