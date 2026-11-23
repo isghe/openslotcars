@@ -81,13 +81,15 @@ function readArchive(raw, signature) {
 
 /** One circuit/configuration archive, with an in-memory fallback for this visit. */
 export function createTimingStorage({ getStorage, circuitId, signature }) {
-  const key = `openslotcars:timing:v1:${circuitId}`;
+  const legacyKey = `openslotcars:timing:v1:${circuitId}`;
+  const key = `openslotcars:timing:v2:${circuitId}:${encodeURIComponent(signature)}`;
   let cached = null;
   return {
     load() {
       if (cached === null) {
         try {
-          cached = readArchive(getStorage().getItem(key), signature);
+          const storage = getStorage();
+          cached = readArchive(storage.getItem(key) ?? storage.getItem(legacyKey), signature);
         } catch {
           cached = createLapTimer();
         }
@@ -109,7 +111,15 @@ export function createTimingStorage({ getStorage, circuitId, signature }) {
     },
     clear() {
       try {
-        getStorage().removeItem(key);
+        const storage = getStorage();
+        let legacySignature;
+        try {
+          legacySignature = JSON.parse(storage.getItem(legacyKey))?.signature;
+        } catch {
+          // A malformed legacy archive cannot match this configuration.
+        }
+        if (legacySignature === signature) storage.removeItem(legacyKey);
+        storage.removeItem(key);
         cached = createLapTimer();
         return true;
       } catch {

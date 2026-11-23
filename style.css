@@ -143,6 +143,12 @@ button[aria-pressed="true"] {
   flex: none;
 }
 
+.display-parameter {
+  margin: 4px 10px 8px;
+  padding-top: 12px;
+  border-top: 1px solid #aab2bd;
+}
+
 .circuit-choice {
   display: flex;
   align-items: center;
