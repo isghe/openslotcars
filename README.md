@@ -1,6 +1,6 @@
 # OpenSlotCars
 
-A slot car racing simulator that runs in your browser, with six circuits, sliding cars and lap timing.
+A slot car racing simulator that runs in your browser, with seven circuits, sliding cars and lap timing.
 
 ![A yellow slot car sliding through a curve and leaving tire marks](docs/screenshot.png)
 

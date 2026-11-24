@@ -54,6 +54,7 @@ test('the menu offers every circuit, in order, with its name', () => {
     [
       ['oval', 'Oval'],
       ['speedway', 'Speedway'],
+      ['speedway-infield', 'Speedway Infield'],
       ['chicane', 'Chicane'],
       ['teardrop', 'Teardrop'],
       ['club', 'Club'],

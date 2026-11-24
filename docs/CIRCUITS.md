@@ -1,6 +1,6 @@
 # The circuits
 
-There are six circuits. The car runs on the lane named inner, and the length given is that of one lap. On Infinite Loop, each lane alternates between the inside and outside of the two lobes. Each picture shows the car in a slide, with its tire marks behind it.
+There are seven circuits. The car runs on the lane named inner, and the length given is that of one lap. On Infinite Loop, each lane alternates between the inside and outside of the two lobes. Each picture shows the car in a slide, with its tire marks behind it.
 
 ## Oval
 
@@ -13,6 +13,10 @@ Two straights joined by two half circles: the plainest circuit, and the one the 
 [![The speedway seen from above, with the yellow car sliding out of the bottom right corner and its tire marks behind it](circuit-speedway.png)](https://isghe.github.io/openslotcars/?circuit=speedway)
 
 A rounded rectangle: four corners instead of two half circles, and two short side straights. A lap is 8.20 m long.
+
+## Speedway Infield
+
+A Speedway variant driven clockwise, with the same 2.8 by 1.8 m centerline footprint, main straight and four outer corners as the original. A long horizontal hairpin fills the upper infield, with 1.35 m and 1.05 m straights, returning toward the right before descending to a smaller detour at the lower left. A 0.25 m straight connects the lower bends. Ten infield corners of radius 0.20 m connect the internal straights. A lap is 14.14 m long. Select **Speedway Infield** from the Circuit menu or open `?circuit=speedway-infield` locally.
 
 ## Chicane
 

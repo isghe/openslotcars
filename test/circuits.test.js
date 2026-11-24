@@ -89,6 +89,9 @@ const EXPECTED_LENGTHS = {
   club: { inner: 6.6 + 1.45 * Math.PI, outer: 6.6 + 1.65 * Math.PI },
   oval: { inner: 4 + 0.7 * Math.PI, outer: 4 + 0.9 * Math.PI },
   speedway: { inner: 6 + 0.7 * Math.PI, outer: 6 + 0.9 * Math.PI },
+  // 8.8 m of straights, outer arc radii totaling 1.6 m and inset radii 2 m,
+  // all quarter turns; net lane offset is +/- 0.1 * PI.
+  'speedway-infield': { inner: 8.8 + 1.7 * Math.PI, outer: 8.8 + 1.9 * Math.PI },
   // 5.9 m of straights (0.6 + 1.2 + 3.5 + 0.6), two half turns made of two
   // quarter circles each (the radii of the lanes of the first half turn add up
   // to 1.683 m - 0.1 m or + 0.1 m, those of the second one to 0.9 m or 1.1 m)
@@ -107,7 +110,7 @@ const EXPECTED_LENGTHS = {
 test('the circuits are listed in order and found by identifier', () => {
   assert.deepEqual(
     CIRCUITS.map((circuit) => circuit.id),
-    ['oval', 'speedway', 'chicane', 'teardrop', 'club', 'infinite-loop'],
+    ['oval', 'speedway', 'speedway-infield', 'chicane', 'teardrop', 'club', 'infinite-loop'],
   );
   assert.ok(Object.isFrozen(CIRCUITS));
   for (const circuit of CIRCUITS) assert.equal(circuitById(circuit.id), circuit);
@@ -119,7 +122,7 @@ test('every circuit has its own readable name, which the built circuit keeps', (
   const names = CIRCUITS.map((circuit) => circuit.name);
   for (const name of names) assert.ok(typeof name === 'string' && name.trim() === name && name !== '');
   assert.equal(new Set(names).size, names.length);
-  assert.deepEqual(names, ['Oval', 'Speedway', 'Chicane', 'Teardrop', 'Club', 'Infinite Loop']);
+  assert.deepEqual(names, ['Oval', 'Speedway', 'Speedway Infield', 'Chicane', 'Teardrop', 'Club', 'Infinite Loop']);
   for (const definition of CIRCUITS) {
     assert.equal(buildCircuit(definition).name, definition.name);
   }
@@ -135,6 +138,56 @@ test('every circuit closes and has the expected lane lengths', () => {
     near(circuit.lanes.outer.length, expected.outer, 1e-9, `${definition.id} outer`);
     if (definition.topology === 'figure-eight') near(circuit.lanes.inner.length, circuit.lanes.outer.length);
     else assert.ok(circuit.lanes.inner.length < circuit.lanes.outer.length, definition.id);
+  }
+});
+
+test('Speedway Infield keeps the outer corners and has an asymmetric infield', () => {
+  const { track } = buildCircuit(circuitById('speedway-infield'));
+  const outer = track.pieces.filter(piece => piece.type === 'curve' && piece.radius === 0.4);
+  assert.equal(outer.length, 4);
+  for (const piece of outer) near(piece.angle, -Math.PI / 2);
+  const original = buildCircuit(circuitById('speedway')).track;
+  const extent = (track, axis) => {
+    const values = track.pieces.flatMap(piece => [piece.start[axis], piece.end[axis]]);
+    return Math.max(...values) - Math.min(...values);
+  };
+  near(extent(track, 'x'), extent(original, 'x'));
+  near(extent(track, 'y'), extent(original, 'y'));
+  near(track.pieces[0].length, 1);
+  near(track.pieces.at(-1).length, 1);
+  // A long horizontal hairpin fills the upper infield; a smaller detour
+  // occupies the lower left, with both connected to the back straight.
+  const entry = track.pieces[5].start;
+  const exit = track.pieces[23].end;
+  near(entry.x, 0.95); near(entry.y, -1.8);
+  near(exit.x, -0.85); near(exit.y, -1.8);
+  near(exit.heading, -Math.PI);
+  const inset = track.pieces.slice(5, 24);
+  assert.deepEqual(inset.filter(piece => piece.type === 'curve').map(piece => piece.radius), Array(10).fill(0.2));
+  near(track.pieces[8].start.x, 0.55);
+  near(track.pieces[8].length, 1.35);
+  near(track.pieces[8].end.x, -0.8);
+  near(track.pieces[8].start.y, -0.35);
+  near(track.pieces[8].end.y, -0.35);
+  near(track.pieces[12].length, 1.05);
+  near(track.pieces[12].start.x, -0.8);
+  near(track.pieces[12].end.x, 0.25);
+  near(track.pieces[12].start.y, -0.9);
+  near(track.pieces[12].end.y, -0.9);
+  near(track.pieces[16].length, 0.25);
+  near(track.pieces[16].start.x, 0.25);
+  near(track.pieces[16].end.x, 0);
+  near(track.pieces[16].start.y, -1.8);
+  near(track.pieces[16].end.y, -1.8);
+  near(track.pieces[20].start.x, -0.4);
+  near(track.pieces[20].end.x, -0.45);
+  near(track.pieces[20].start.y, -1.3);
+  near(track.pieces[20].end.y, -1.3);
+  for (const piece of inset) {
+    for (const point of [piece.start, piece.end]) {
+      assert.ok(point.x >= -1 - EPSILON && point.x <= 0.95 + EPSILON);
+      assert.ok(point.y >= -1.8 - EPSILON && point.y <= -0.35 + EPSILON);
+    }
   }
 });
 

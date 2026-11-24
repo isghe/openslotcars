@@ -67,5 +67,5 @@ test('real static HTTP server serves JSON with the expected catalog and MIME typ
   const response=await fetch(new URL('club.json',baseUrl));
   assert.match(response.headers.get('content-type'),/application\/json/);
   const catalog=await loadCircuits({baseUrl});
-  assert.deepEqual(catalog.circuits.map(c=>c.id),['oval','speedway','chicane','teardrop','club','infinite-loop']);
+  assert.deepEqual(catalog.circuits.map(c=>c.id),['oval','speedway','speedway-infield','chicane','teardrop','club','infinite-loop']);
 });
