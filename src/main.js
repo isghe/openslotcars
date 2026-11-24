@@ -12,17 +12,11 @@ import { createTimingStorage } from './data/timingStorage.js';
 import { createControls } from './core/controls.js';
 import { createGame } from './core/game.js';
 import { createContext } from './core/simulation.js';
-import { DEFAULT_PARAMS, withParams } from './core/physics.js';
 import { createHud } from './ui/hud.js';
 import { addressWithCircuit, bindCircuitSelect, circuitFromSearch } from './ui/circuitSelect.js';
 import { addressWithDisplayOption, bindDisplayMenu, displayOptionsFromSearch } from './ui/displayOptions.js';
 import { bindInput } from './ui/input.js';
 import { createRenderer } from './ui/render.js';
-
-// Driving setup: halve lateral grip on every circuit.
-const drivingParams = withParams({
-  maxLateralAcceleration: DEFAULT_PARAMS.maxLateralAcceleration / 2,
-});
 
 const displayOptions = displayOptionsFromSearch(window.location.search);
 const displayCheckboxes = {
@@ -76,7 +70,7 @@ async function start() {
   /** Builds the circuit, the car on it and the drawing, and shows its name. */
   function startCircuit(definition) {
     const circuit = buildCircuit(definition);
-    const context = createContext({ lane: circuit.lanes.inner, params: drivingParams });
+    const context = createContext({ lane: circuit.lanes.inner });
     document.getElementById('lateral-grip').textContent = String(context.params.maxLateralAcceleration);
     activeCircuit = definition;
     if (!timingArchives.has(definition.id)) {
