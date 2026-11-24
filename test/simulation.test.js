@@ -14,6 +14,28 @@ import {
 
 const circuit = buildCircuit(OVAL);
 
+test('Speedway Infield allows slow laps without spinning out from rolling geometry', () => {
+  const definition = CIRCUITS.find(circuit => circuit.id === 'speedway-infield');
+  for (const lane of Object.values(buildCircuit(definition).lanes)) {
+    for (const speed of [0.1, 0.25, 0.5]) {
+      const context = createContext({ lane });
+      const params = context.params;
+      const throttle = speed / params.freeSpeed
+        + (params.rollingFriction + params.airDrag * speed ** 2) / params.spinUpAcceleration;
+      let world = createWorld(context);
+      world = { ...world, car: { ...world.car, speed } };
+      const finish = world.car.distance + 2 * lane.length;
+      const steps = Math.ceil(2 * lane.length / (speed * context.dt)) + 1;
+      for (let step = 0; step < steps && world.car.distance < finish; step += 1) {
+        world = stepWorld(world, { throttle }, context);
+        assert.equal(world.car.status, 'onTrack', `offset ${lane.offset}, speed ${speed}, distance ${world.car.distance}`);
+        assert.equal(world.car.rearSlip, 0, `rear wheels slide at speed ${speed}`);
+      }
+      assert.ok(world.car.distance >= finish, `did not complete two laps at speed ${speed}`);
+    }
+  }
+});
+
 /**
  * Context of the plain model, where the car is a single point on the lane. The
  * tail rule is on by default, so the plain model is asked for explicitly.

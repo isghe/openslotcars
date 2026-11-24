@@ -68,7 +68,8 @@ for (const definition of CIRCUITS) {
     assert.ok(drawing.rectangles.every(rectangle => !['#00ff66', '#c060ff'].includes(rectangle.color)));
     // Slower attempts turn sector squares yellow and clear cumulative squares.
     for (let boundary = 1; boundary <= 4; boundary += 1) {
-      const distance = context.laneLength * (1 + boundary / 4);
+      // Cross the boundary even when multiplication rounds onto its approach side.
+      const distance = context.laneLength * (1 + boundary / 4 + 1e-12);
       ({ timer } = advanceTimer(timer, {
         previousTime, dt: 2, previousDistance, distance, laneLength: context.laneLength,
       }));

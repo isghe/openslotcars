@@ -1,6 +1,7 @@
 [
   "oval.json",
   "speedway.json",
+  "speedway-infield.json",
   "chicane.json",
   "teardrop.json",
   "club.json",
