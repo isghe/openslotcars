@@ -16,7 +16,9 @@ A rounded rectangle: four corners instead of two half circles, and two short sid
 
 ## Speedway Infield
 
-A Speedway variant driven clockwise, with the same 2.8 by 1.8 m centerline footprint, main straight and four outer corners as the original. A long horizontal hairpin fills the upper infield, with 1.35 m and 1.05 m straights, returning toward the right before descending to a smaller detour at the lower left. A 0.25 m straight connects the lower bends. Ten infield corners of radius 0.20 m connect the internal straights. A lap is 14.14 m long. Select **Speedway Infield** from the Circuit menu or open `?circuit=speedway-infield` locally.
+[![The Speedway Infield seen from above, with the car sliding through the top right corner and its tire marks behind it](circuit-speedway-infield.png)](https://isghe.github.io/openslotcars/?circuit=speedway-infield)
+
+The longest circuit. A Speedway variant driven clockwise, with a long horizontal hairpin inside the rectangle and a smaller detour at the bottom left. A lap is 14.14 m long.
 
 ## Chicane
 
@@ -34,7 +36,7 @@ A wide curve at one end and a tight hairpin at the other, joined by two straight
 
 [![The L-shaped Club circuit seen from above, with the yellow car sliding in the top left corner and its tire marks behind it](circuit-club.png)](https://isghe.github.io/openslotcars/?circuit=club)
 
-The longest circuit. A rounded L driven clockwise, with a wide first curve, five right turns of different radii and a left turn in the inside corner. A lap is 11.16 m long.
+A rounded L driven clockwise, with a wide first curve, five right turns of different radii and a left turn in the inside corner. A lap is 11.16 m long.
 
 ## Infinite Loop
 
