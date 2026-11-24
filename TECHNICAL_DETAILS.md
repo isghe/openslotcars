@@ -76,8 +76,8 @@ The throttle rises gradually while the key is held, in 0.4 seconds from nothing 
 
 The game pauses by itself when the window loses the focus or the page is hidden.
 
-The page uses a lateral grip limit of 6 m/s² on every circuit, half the physics
-module's default, while keeping the motor free speed at 5 m/s.
+The page uses the physics module's default lateral grip limit of 12 m/s² on
+every circuit, while keeping the motor free speed at 5 m/s.
 
 Timing archives use `openslotcars:timing:v2:<circuit-id>:<encoded-signature>` in
 localStorage, with the full signature encoded using `encodeURIComponent`. They
@@ -153,7 +153,7 @@ parameter is repeated, its first value counts. The menu updates the current
 address so the options can be reopened or shared.
 
 The menu also shows **Lateral grip**, the active circuit's lateral acceleration
-limit in m/s² (currently 6 m/s²). This read-only value comes from the simulation
+limit in m/s² (currently 12 m/s²). This read-only value comes from the simulation
 parameters and updates when a circuit starts; it cannot be changed from the menu.
 
 Each join between arcs has one shared exit/entry line, even when both arcs
