@@ -1,4 +1,4 @@
-const PARAMETERS = { curbs: 'curbs', curveMarkers: 'curve-markers', sectorFeedback: 'sector-feedback' };
+const PARAMETERS = { curbs: 'curbs', curveMarkers: 'curve-markers', sectorFeedback: 'sector-feedback', frameMeter: 'fps' };
 
 export function displayOptionsFromSearch(search) {
   const params = new URLSearchParams(search);
@@ -6,6 +6,8 @@ export function displayOptionsFromSearch(search) {
     curbs: (params.get(PARAMETERS.curbs) ?? '1') === '1',
     curveMarkers: (params.get(PARAMETERS.curveMarkers) ?? '1') === '1',
     sectorFeedback: (params.get(PARAMETERS.sectorFeedback) ?? '1') === '1',
+    // A diagnostic tool: unlike the others, off unless asked for.
+    frameMeter: params.get(PARAMETERS.frameMeter) === '1',
   };
 }
 

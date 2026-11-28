@@ -149,6 +149,36 @@ button[aria-pressed="true"] {
   border-top: 1px solid #aab2bd;
 }
 
+/* Fixed and out of the flow: showing it does not move the track. */
+.frame-meter {
+  position: fixed;
+  top: 4px;
+  right: 4px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgb(22 27 33 / 85%);
+  color: var(--page-muted);
+  font-size: 0.65rem;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: pre;
+  pointer-events: none;
+  display: flex;
+  gap: 6px;
+}
+
+/* `display` above would otherwise win over the `hidden` attribute. */
+.frame-meter[hidden] {
+  display: none;
+}
+
+@media (max-width: 340px) {
+  .frame-meter {
+    font-size: 0.58rem;
+  }
+}
+
 .circuit-choice {
   display: flex;
   align-items: center;

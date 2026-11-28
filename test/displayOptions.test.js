@@ -4,11 +4,11 @@ import { addressWithDisplayOption, displayOptionsFromSearch } from '../src/ui/di
 
 test('display options are on for missing parameters and the exact value 1', () => {
   for (const search of ['', '?circuit=club', '?curbs=1&curve-markers=1&sector-feedback=1']) {
-    assert.deepEqual(displayOptionsFromSearch(search), { curbs: true, curveMarkers: true, sectorFeedback: true }, search);
+    assert.deepEqual(displayOptionsFromSearch(search), { curbs: true, curveMarkers: true, sectorFeedback: true, frameMeter: false }, search);
   }
   for (const value of ['', '0', 'true', '01', '+1', '1+']) {
     const search = `?curbs=${value}&curve-markers=${value}&sector-feedback=${value}`;
-    assert.deepEqual(displayOptionsFromSearch(search), { curbs: false, curveMarkers: false, sectorFeedback: false }, search);
+    assert.deepEqual(displayOptionsFromSearch(search), { curbs: false, curveMarkers: false, sectorFeedback: false, frameMeter: false }, search);
   }
 });
 
@@ -17,11 +17,13 @@ test('each display option reads its own first value', () => {
     curbs: false,
     curveMarkers: true,
     sectorFeedback: false,
+    frameMeter: false,
   });
   assert.deepEqual(displayOptionsFromSearch('?curbs=1&curve-markers=0'), {
     curbs: true,
     curveMarkers: false,
     sectorFeedback: true,
+    frameMeter: false,
   });
 });
 
@@ -37,4 +39,13 @@ test('writing a display option preserves the path, fragment and other parameters
   assert.equal(displayOptionsFromSearch(new URL(hidden).search).sectorFeedback, false);
   const shown = addressWithDisplayOption(hidden, 'sectorFeedback', true);
   assert.equal(displayOptionsFromSearch(new URL(shown).search).sectorFeedback, true);
+});
+
+test('the frame meter is off unless its parameter is exactly 1', () => {
+  assert.equal(displayOptionsFromSearch('?fps=1').frameMeter, true);
+  for (const search of ['', '?fps=0', '?fps=', '?fps=true']) {
+    assert.equal(displayOptionsFromSearch(search).frameMeter, false, search);
+  }
+  const shown = addressWithDisplayOption('https://example.test/?circuit=club', 'frameMeter', true);
+  assert.equal(shown, 'https://example.test/?circuit=club&fps=1');
 });
