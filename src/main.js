@@ -13,6 +13,7 @@ import { createControls } from './core/controls.js';
 import { createGame } from './core/game.js';
 import { createContext } from './core/simulation.js';
 import { createHud } from './ui/hud.js';
+import { createFrameMeter } from './ui/frameMeter.js';
 import { addressWithCircuit, bindCircuitSelect, circuitFromSearch } from './ui/circuitSelect.js';
 import { addressWithDisplayOption, bindDisplayMenu, displayOptionsFromSearch } from './ui/displayOptions.js';
 import { bindInput } from './ui/input.js';
@@ -23,6 +24,7 @@ const displayCheckboxes = {
   curbs: document.getElementById('show-curbs'),
   curveMarkers: document.getElementById('show-curve-markers'),
   sectorFeedback: document.getElementById('show-sector-feedback'),
+  frameMeter: document.getElementById('show-frame-meter'),
 };
 for (const [option, checkbox] of Object.entries(displayCheckboxes)) {
   checkbox.checked = displayOptions[option];
@@ -60,6 +62,8 @@ async function start() {
   });
 
   const controls = createControls();
+  const frameMeter = createFrameMeter(document.getElementById('frame-meter'));
+  frameMeter.setVisible(displayOptions.frameMeter);
 
   let game;
   let renderer;
@@ -119,6 +123,7 @@ async function start() {
     checkbox.addEventListener('change', () => {
       displayOptions[option] = checkbox.checked;
       renderer.setDisplayOptions(displayOptions);
+      frameMeter.setVisible(displayOptions.frameMeter);
       try {
         window.history.replaceState(
           window.history.state,
@@ -167,6 +172,7 @@ async function start() {
   }
 
   function frame(now) {
+    const workStart = performance.now();
     const result = game.frame(now);
     timingStorage.save(result.world.timer);
     if (result.restarted) hud.restart(result.world);
@@ -179,11 +185,17 @@ async function start() {
       hud.update(result.world);
       renderer.draw(result.drawn, { steps, restarted });
     }
+    // In a pause the figures stay on screen as they were, to be read.
+    if (result.paused) frameMeter.gap();
+    else frameMeter.add(now, performance.now() - workStart);
     requestAnimationFrame(frame);
   }
 
   // After the page was hidden the elapsed time is meaningless: start over.
-  document.addEventListener('visibilitychange', () => game.resetClock());
+  document.addEventListener('visibilitychange', () => {
+    game.resetClock();
+    frameMeter.gap();
+  });
 
   new ResizeObserver(() => renderer.resize()).observe(canvas);
   requestAnimationFrame(frame);

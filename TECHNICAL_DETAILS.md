@@ -156,6 +156,14 @@ The menu also shows **Lateral grip**, the active circuit's lateral acceleration
 limit in m/s² (currently 12 m/s²). This read-only value comes from the simulation
 parameters and updates when a circuit starts; it cannot be changed from the menu.
 
+**Show frame meter** is a diagnostic tool, off by default (`?fps=1` turns it
+on). It shows, in the top right corner and over the last 5 s of play: the
+average frame rate (`fps`), the longest time between two frames (`worst`), how
+many of those times exceed 1.5 times the median one (`long`) and the longest time
+spent by the game code in a frame (`code`). `code` is the time of the frame
+callback only: it does not include the work the browser does afterwards to put
+the drawing on screen. The figures stand still while the game is paused.
+
 Each join between arcs has one shared exit/entry line, even when both arcs
 turn the same way. This also shows changes of radius in compound corners.
 Violet lines mark the midpoint of each individual arc and each continuous
