@@ -1,9 +1,9 @@
 /**
  * Statistics of the animation frames, to see whether the game stutters.
  *
- * The page passes the time of each frame and how long its own code took in it;
- * the figures cover the most recent frames only. This module is pure logic: it
- * never reads a clock.
+ * The page passes the time of each frame and how long the parts of its own code
+ * took in it; the figures cover the most recent frames only. This module is
+ * pure logic: it never reads a clock.
  */
 
 // A frame counts as long when it lasts more than this many typical (median)
@@ -21,10 +21,15 @@ export function createFrameStats({ windowMs = 5000 } = {}) {
     /**
      * Adds a frame.
      * @param {number} now Time of the frame in milliseconds.
-     * @param {number} workMs Time spent by the game code in this frame.
+     * @param {{sim: number, save: number, draw: number}} work Milliseconds
+     *   spent by the game code in this frame: simulation, saving of the times
+     *   and drawing of the page.
      */
-    add(now, workMs) {
-      if (lastTime !== null) samples.push({ now, interval: now - lastTime, workMs });
+    add(now, { sim, save, draw }) {
+      if (lastTime !== null) {
+        const work = { total: sim + save + draw, sim, save, draw };
+        samples.push({ now, interval: now - lastTime, work });
+      }
       lastTime = now;
       while (samples.length > 0 && now - samples[0].now >= windowMs) samples.shift();
     },
@@ -44,10 +49,12 @@ export function createFrameStats({ windowMs = 5000 } = {}) {
     },
 
     /**
-     * @returns {null|{fps: number, worstMs: number, longFrames: number, worstWorkMs: number}}
+     * @returns {null|{fps: number, worstMs: number, longFrames: number,
+     *   slowestWork: {total: number, sim: number, save: number, draw: number}}}
      *   `fps` is the average rate, `worstMs` the longest interval, `longFrames`
-     *   how many intervals were long and `worstWorkMs` the longest time spent by
-     *   the game code. `null` before the second frame.
+     *   how many intervals were long and `slowestWork` the time spent by the
+     *   game code in the frame where it was the longest, with its parts.
+     *   `null` before the second frame.
      */
     summary() {
       if (samples.length === 0) return null;
@@ -58,7 +65,9 @@ export function createFrameStats({ windowMs = 5000 } = {}) {
         fps: (1000 * intervals.length) / total,
         worstMs: intervals[intervals.length - 1],
         longFrames: intervals.filter((interval) => interval > LONG_FRAME_RATIO * median).length,
-        worstWorkMs: Math.max(...samples.map((sample) => sample.workMs)),
+        slowestWork: samples.reduce((slowest, { work }) => (
+          work.total > slowest.total ? work : slowest
+        ), samples[0].work),
       };
     },
   };

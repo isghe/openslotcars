@@ -9,28 +9,36 @@ const REFRESH_MS = 500;
 export function createFrameMeter(element) {
   const stats = createFrameStats();
   let shownAt = null;
+  // Two columns, to stay narrow enough for the free corner of a phone.
+  const [frames, parts] = ['span', 'span'].map((tag) => element.ownerDocument.createElement(tag));
 
   return {
     setVisible(visible) {
       if (visible === !element.hidden) return;
       element.hidden = !visible;
-      element.textContent = visible ? 'measuring…' : '';
+      element.replaceChildren(frames, parts);
+      frames.textContent = 'measuring…';
+      parts.textContent = '';
       stats.reset();
       shownAt = null;
     },
 
     /** Adds a frame; see `createFrameStats`. */
-    add(now, workMs) {
+    add(now, work) {
       if (element.hidden) return;
-      stats.add(now, workMs);
+      stats.add(now, work);
       if (shownAt !== null && now - shownAt < REFRESH_MS) return;
       const summary = stats.summary();
       if (summary === null) return;
       shownAt = now;
-      element.textContent = `${summary.fps.toFixed(0)} fps\n`
-        + `worst ${summary.worstMs.toFixed(0)} ms\n`
+      const { total, sim, save, draw } = summary.slowestWork;
+      frames.textContent = `${summary.fps.toFixed(0)} fps\n`
+        + `worst ${summary.worstMs.toFixed(0)}\n`
         + `long ${summary.longFrames}\n`
-        + `code ${summary.worstWorkMs.toFixed(1)} ms`;
+        + `code ${total.toFixed(1)}`;
+      parts.textContent = `sim ${sim.toFixed(1)}\n`
+        + `save ${save.toFixed(1)}\n`
+        + `draw ${draw.toFixed(1)}`;
     },
 
     gap() {

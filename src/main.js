@@ -174,7 +174,9 @@ async function start() {
   function frame(now) {
     const workStart = performance.now();
     const result = game.frame(now);
+    const simulated = performance.now();
     timingStorage.save(result.world.timer);
+    const saved = performance.now();
     if (result.restarted) hud.restart(result.world);
     syncButtons();
 
@@ -187,7 +189,13 @@ async function start() {
     }
     // In a pause the figures stay on screen as they were, to be read.
     if (result.paused) frameMeter.gap();
-    else frameMeter.add(now, performance.now() - workStart);
+    else {
+      frameMeter.add(now, {
+        sim: simulated - workStart,
+        save: saved - simulated,
+        draw: performance.now() - saved,
+      });
+    }
     requestAnimationFrame(frame);
   }
 

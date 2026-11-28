@@ -164,6 +164,19 @@ button[aria-pressed="true"] {
   text-align: right;
   white-space: pre;
   pointer-events: none;
+  display: flex;
+  gap: 6px;
+}
+
+/* `display` above would otherwise win over the `hidden` attribute. */
+.frame-meter[hidden] {
+  display: none;
+}
+
+@media (max-width: 340px) {
+  .frame-meter {
+    font-size: 0.58rem;
+  }
 }
 
 .circuit-choice {

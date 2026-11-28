@@ -160,7 +160,9 @@ parameters and updates when a circuit starts; it cannot be changed from the menu
 on). It shows, in the top right corner and over the last 5 s of play: the
 average frame rate (`fps`), the longest time between two frames (`worst`), how
 many of those times exceed 1.5 times the median one (`long`) and the longest time
-spent by the game code in a frame (`code`). `code` is the time of the frame
+spent by the game code in a frame (`code`). Beside them are the parts of that
+same frame: `sim` (simulation), `save` (saving of the times) and `draw` (panel
+and canvas). The times are in milliseconds. `code` is the time of the frame
 callback only: it does not include the work the browser does afterwards to put
 the drawing on screen. The figures stand still while the game is paused.
 
